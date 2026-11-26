@@ -4,12 +4,14 @@ A Windowsos Szemkímélő Android változata (natív Kotlin + Jetpack Compose).
 
 ## Funkciók
 
-- **20-20-20 szünet:** 20 percenként (állítható) teljes képernyős, sötétített visszaszámláló
-  jelenik meg más appok felett: nagy számláló, folyamatjelző, pulzáló keret, `Kihagyom` gomb
-- Hang nincs; a szünet elején opcionális rövid rezgés
+- **20-20-20 szünet:** 20 percenként (állítható) teljes képernyős visszaszámláló jelenik meg
+  más appok felett: nagy számláló, folyamatjelző, pulzáló keret, `Kihagyom` gomb
+- **Hangjelzés** (a telefon értesítési hangja) és opcionális rezgés a szünet elején és az emlékeztetőknél;
+  mindkettő külön kapcsolható az appban
+- **Zárolt képernyőn is megjelenik:** a telefon felébred, és a visszaszámláló a lezárási képernyő felett látszik
+- A `+` / `−` gombok nyomva tartva folyamatosan (egyre gyorsabban) változtatják az értéket
 - **Ivás emlékeztető** óránként (az időköz 15–240 perc között állítható), felugró értesítés
 - **Ebéd emlékeztető** beállítható időponttal, napi egyszer; elhalasztható 10 percre
-- Ha a telefon zárolva van a lejáratkor, a szünet a feloldás után jelenik meg
 - Újraindítás után az emlékeztetők maguktól folytatódnak
 
 ## Engedélyek
@@ -17,7 +19,8 @@ A Windowsos Szemkímélő Android változata (natív Kotlin + Jetpack Compose).
 | Engedély | Mire kell |
 |---|---|
 | Értesítések | ivás és ebéd emlékeztető, futás jelzése |
-| Megjelenítés más appok felett | teljes képernyős visszaszámláló (nélküle csak értesítést kapsz) |
+| Megjelenítés más appok felett | teljes képernyős visszaszámláló használat közben (nélküle csak értesítést kapsz) |
+| Teljes képernyős értesítések | a visszaszámláló zárolt képernyő felett (Android 14+: kézzel kell engedélyezni, az app jelzi) |
 | Pontos ébresztők | az emlékeztetők pontos időzítése (automatikusan megkapja) |
 
 ## Telepítés (APK)

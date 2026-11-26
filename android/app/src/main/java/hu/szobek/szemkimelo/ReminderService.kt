@@ -3,11 +3,12 @@ package hu.szobek.szemkimelo
 import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.app.Service
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
+import android.media.Ringtone
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -27,33 +28,15 @@ class ReminderService : Service() {
     private lateinit var prefs: Prefs
     private val handler = Handler(Looper.getMainLooper())
     private var overlay: BreakOverlay? = null
+    private var ringtone: Ringtone? = null
     private var breakActive = false
-    private var pendingBreak = false
 
     private val finishRunnable = Runnable { finishBreak() }
-
-    /** Ha a szünet ideje alatt a telefon zárolva volt, feloldás után indítjuk el. */
-    private val screenReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (pendingBreak && deviceReady()) {
-                pendingBreak = false
-                startBreak()
-            }
-        }
-    }
 
     override fun onCreate() {
         super.onCreate()
         prefs = Prefs(this)
         Notifications.ensureChannels(this)
-        ContextCompat.registerReceiver(
-            this, screenReceiver,
-            IntentFilter().apply {
-                addAction(Intent.ACTION_SCREEN_ON)
-                addAction(Intent.ACTION_USER_PRESENT)
-            },
-            ContextCompat.RECEIVER_EXPORTED
-        )
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -75,6 +58,7 @@ class ReminderService : Service() {
             }
             ACTION_RESTORE -> updateForeground()
             Scheduler.ACTION_BREAK, ACTION_BREAK_NOW -> handleBreak()
+            ACTION_BREAK_FINISHED -> if (breakActive) finishBreak()
             Scheduler.ACTION_WATER -> {
                 if (prefs.waterEnabled) {
                     Notifications.water(this)
@@ -104,7 +88,6 @@ class ReminderService : Service() {
     private fun scheduleAll() {
         val now = System.currentTimeMillis()
         dismissBreak()
-        pendingBreak = false
 
         prefs.nextBreakAt = now + prefs.workMinutes * 60_000L
         Scheduler.set(this, Scheduler.ACTION_BREAK, prefs.nextBreakAt)
@@ -127,6 +110,7 @@ class ReminderService : Service() {
     }
 
     // ---------------------------------------------------------------- szünet
+    /** Fel van-e oldva és be van-e kapcsolva a kijelző (ilyenkor jelenhet meg ablak más appok felett). */
     private fun deviceReady(): Boolean {
         val pm = getSystemService(PowerManager::class.java)
         val km = getSystemService(KeyguardManager::class.java)
@@ -136,13 +120,6 @@ class ReminderService : Service() {
     private fun handleBreak() {
         if (breakActive) return
         Scheduler.cancel(this, Scheduler.ACTION_BREAK)
-        if (!deviceReady()) {
-            // Zárolt telefon: feloldás után mutatjuk a szünetet, nincs értelme a zsebnek jelezni.
-            pendingBreak = true
-            prefs.nextBreakAt = 0
-            updateForeground()
-            return
-        }
         startBreak()
     }
 
@@ -151,6 +128,18 @@ class ReminderService : Service() {
         prefs.nextBreakAt = 0
         updateForeground()
         if (prefs.vibrate) vibrate()
+        if (prefs.sound) playSound()
+
+        if (!deviceReady()) {
+            // Zárolt képernyő vagy kikapcsolt kijelző: teljes képernyős értesítés indítja a szünet-képernyőt
+            // a zárolt képernyő fölött (felkapcsolja a kijelzőt is). Az Activity lejárati biztosítékkal fut.
+            Notifications.breakAlert(
+                this, prefs.breakSeconds, prefs.workMinutes,
+                fullScreen = Notifications.canUseFullScreenIntent(this)
+            )
+            handler.postDelayed(finishRunnable, (prefs.breakSeconds + 20) * 1000L)
+            return
+        }
 
         val shown = Settings.canDrawOverlays(this) && runCatching {
             overlay = BreakOverlay(this).also {
@@ -158,10 +147,10 @@ class ReminderService : Service() {
             }
         }.isSuccess
         if (!shown) {
-            // Nincs engedély (vagy a rendszer elutasította az ablakot): értesítéssel jelzünk.
+            // Nincs engedély (vagy a rendszer elutasította az ablakot): felugró értesítéssel jelzünk.
             overlay?.dismiss()
             overlay = null
-            Notifications.breakFallback(this, prefs.breakSeconds, prefs.workMinutes)
+            Notifications.breakAlert(this, prefs.breakSeconds, prefs.workMinutes, fullScreen = false)
             handler.postDelayed(finishRunnable, prefs.breakSeconds * 1000L)
         }
     }
@@ -169,7 +158,6 @@ class ReminderService : Service() {
     private fun finishBreak() {
         handler.removeCallbacks(finishRunnable)
         dismissBreak()
-        breakActive = false
         if (!prefs.running) return
         prefs.nextBreakAt = System.currentTimeMillis() + prefs.workMinutes * 60_000L
         Scheduler.set(this, Scheduler.ACTION_BREAK, prefs.nextBreakAt)
@@ -180,8 +168,27 @@ class ReminderService : Service() {
         handler.removeCallbacks(finishRunnable)
         overlay?.dismiss()
         overlay = null
+        ringtone?.stop()
+        ringtone = null
         Notifications.cancel(this, Notifications.ID_BREAK)
         breakActive = false
+    }
+
+    private fun playSound() {
+        runCatching {
+            ringtone?.stop()
+            ringtone = RingtoneManager.getRingtone(
+                this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            )?.apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                play()
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -216,7 +223,6 @@ class ReminderService : Service() {
         prefs.nextBreakAt = 0
         Scheduler.cancelAll(this)
         dismissBreak()
-        pendingBreak = false
         handler.removeCallbacksAndMessages(null)
         listOf(Notifications.ID_WATER, Notifications.ID_LUNCH, Notifications.ID_BREAK)
             .forEach { Notifications.cancel(this, it) }
@@ -225,7 +231,7 @@ class ReminderService : Service() {
     }
 
     override fun onDestroy() {
-        runCatching { unregisterReceiver(screenReceiver) }
+        ringtone?.stop()
         overlay?.dismiss()
         super.onDestroy()
     }
@@ -236,6 +242,7 @@ class ReminderService : Service() {
         const val ACTION_RESCHEDULE = "hu.szobek.szemkimelo.action.RESCHEDULE"
         const val ACTION_RESTORE = "hu.szobek.szemkimelo.action.RESTORE"
         const val ACTION_BREAK_NOW = "hu.szobek.szemkimelo.action.BREAK_NOW"
+        const val ACTION_BREAK_FINISHED = "hu.szobek.szemkimelo.action.BREAK_FINISHED"
         const val ACTION_LUNCH_SNOOZE = "hu.szobek.szemkimelo.action.LUNCH_SNOOZE"
         const val ACTION_LUNCH_DONE = "hu.szobek.szemkimelo.action.LUNCH_DONE"
 

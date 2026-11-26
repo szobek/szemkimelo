@@ -2,6 +2,7 @@ package hu.szobek.szemkimelo
 
 import android.Manifest
 import android.app.TimePickerDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -12,7 +13,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,11 +25,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,16 +48,21 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val Bg = Color(0xFF14213D)
 private val CardBg = Color(0xFF1C2D52)
@@ -77,6 +90,18 @@ private fun fmtRemaining(ms: Long): String {
     return "%d:%02d".format(s / 60, s % 60)
 }
 
+private fun openOverlaySettings(ctx: Context) = ctx.startActivity(
+    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}"))
+)
+
+private fun openFullScreenIntentSettings(ctx: Context) {
+    if (Build.VERSION.SDK_INT >= 34) {
+        ctx.startActivity(
+            Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:${ctx.packageName}"))
+        )
+    }
+}
+
 @Composable
 private fun MainScreen() {
     val ctx = LocalContext.current
@@ -90,11 +115,14 @@ private fun MainScreen() {
     var lunchM by remember { mutableIntStateOf(prefs.lunchMinute) }
     var waterOn by remember { mutableStateOf(prefs.waterEnabled) }
     var waterMin by remember { mutableIntStateOf(prefs.waterMinutes) }
+    var sound by remember { mutableStateOf(prefs.sound) }
     var vibrate by remember { mutableStateOf(prefs.vibrate) }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var nextBreak by remember { mutableLongStateOf(prefs.nextBreakAt) }
     var canDraw by remember { mutableStateOf(Settings.canDrawOverlays(ctx)) }
+    var canFullScreen by remember { mutableStateOf(Notifications.canUseFullScreenIntent(ctx)) }
+    var showPermissionDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -102,13 +130,23 @@ private fun MainScreen() {
             nextBreak = prefs.nextBreakAt
             running = prefs.running
             canDraw = Settings.canDrawOverlays(ctx)
+            canFullScreen = Notifications.canUseFullScreenIntent(ctx)
             delay(500)
         }
     }
 
-    /** Beállítás módosítása után az ütemezést újra kell számolni. */
-    fun applyChanges() {
-        if (running) ReminderService.send(ctx, ReminderService.ACTION_RESCHEDULE)
+    /**
+     * Beállítás módosítása után újra kell számolni az ütemezést. Gyors léptetésnél (nyomva tartott
+     * gomb) csak a változások megállta után küldjük el, nem minden lépésnél.
+     */
+    var firstRun by remember { mutableStateOf(true) }
+    LaunchedEffect(workMin, waterMin, waterOn, lunchOn, lunchH, lunchM) {
+        if (firstRun) {
+            firstRun = false
+            return@LaunchedEffect
+        }
+        delay(700)
+        if (prefs.running) ReminderService.send(ctx, ReminderService.ACTION_RESCHEDULE)
     }
 
     fun startReminders() {
@@ -120,6 +158,44 @@ private fun MainScreen() {
     val notifPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { startReminders() }
+
+    fun requestNotificationsThenStart() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            startReminders()
+        }
+    }
+
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text("Engedélyek a figyelmeztetéshez") },
+            text = {
+                Text(
+                    buildString {
+                        append("Hogy a szünet minden felett és zárolt képernyőn is megjelenjen, két engedély kell:\n")
+                        if (!canDraw) append("\n• Megjelenítés más appok felett")
+                        if (!canFullScreen) append("\n• Teljes képernyős értesítések")
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPermissionDialog = false
+                    if (!canDraw) openOverlaySettings(ctx) else openFullScreenIntentSettings(ctx)
+                }) { Text("Beállítás") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPermissionDialog = false
+                    requestNotificationsThenStart()
+                }) { Text("Indítás így") }
+            }
+        )
+    }
 
     Column(
         Modifier
@@ -164,62 +240,47 @@ private fun MainScreen() {
                     }
                 } else {
                     Button(onClick = {
-                        if (Build.VERSION.SDK_INT >= 33 &&
-                            ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                            != PackageManager.PERMISSION_GRANTED
-                        ) {
-                            notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            startReminders()
-                        }
+                        if (!canDraw || !canFullScreen) showPermissionDialog = true
+                        else requestNotificationsThenStart()
                     }) { Text("Indítás") }
                 }
             }
         }
 
-        // --- Engedély más appok felett
-        SectionCard {
-            if (canDraw) {
-                Text("✓ A teljes képernyős figyelmeztetés engedélyezve van.", color = Muted, fontSize = 14.sp)
-            } else {
-                Text(
-                    "A teljes képernyős visszaszámláláshoz engedélyezd a \"Megjelenítés más appok felett\" " +
-                        "beállítást. Nélküle csak értesítést kapsz.",
-                    color = Muted, fontSize = 14.sp
-                )
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = {
-                    ctx.startActivity(
-                        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}"))
-                    )
-                }) { Text("Engedély megadása") }
-            }
+        // --- Engedélyek a megjelenéshez
+        SectionCard("Megjelenés minden felett") {
+            PermissionRow(
+                granted = canDraw,
+                grantedText = "Más appok felett: engedélyezve",
+                missingText = "Más appok felett: nincs engedélyezve. Nélküle a szünet csak értesítésként jön.",
+                onFix = { openOverlaySettings(ctx) }
+            )
+            PermissionRow(
+                granted = canFullScreen,
+                grantedText = "Zárolt képernyőn: engedélyezve",
+                missingText = "Zárolt képernyőn: nincs engedélyezve. Nélküle a szünet zárolt telefonon csak értesítésként jön.",
+                onFix = { openFullScreenIntentSettings(ctx) }
+            )
         }
 
         // --- Szünet
         SectionCard("Szünet") {
-            Stepper("Munka (perc)", workMin, 1, 180, 1) {
-                workMin = it; prefs.workMinutes = it; applyChanges()
-            }
-            Stepper("Szünet (másodperc)", breakSec, 5, 300, 5) {
-                breakSec = it; prefs.breakSeconds = it
-            }
+            Stepper("Munka (perc)", workMin, 1, 180, 1) { workMin = it; prefs.workMinutes = it }
+            Stepper("Szünet (másodperc)", breakSec, 5, 300, 5) { breakSec = it; prefs.breakSeconds = it }
+            SwitchRow("Hangjelzés", sound) { sound = it; prefs.sound = it }
             SwitchRow("Rezgés a szünet elején", vibrate) { vibrate = it; prefs.vibrate = it }
         }
 
         // --- Ebéd
         SectionCard("Ebéd") {
-            SwitchRow("Ebéd emlékeztető", lunchOn) { lunchOn = it; prefs.lunchEnabled = it; applyChanges() }
+            SwitchRow("Ebéd emlékeztető", lunchOn) { lunchOn = it; prefs.lunchEnabled = it }
             if (lunchOn) {
-                Row(
-                    Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Időpont", Modifier.weight(1f))
                     OutlinedButton(onClick = {
                         TimePickerDialog(ctx, { _, h, m ->
                             lunchH = h; lunchM = m
                             prefs.lunchHour = h; prefs.lunchMinute = m
-                            applyChanges()
                         }, lunchH, lunchM, true).show()
                     }) { Text("%02d:%02d".format(lunchH, lunchM)) }
                 }
@@ -228,11 +289,9 @@ private fun MainScreen() {
 
         // --- Ivás
         SectionCard("Ivás") {
-            SwitchRow("Ivás emlékeztető", waterOn) { waterOn = it; prefs.waterEnabled = it; applyChanges() }
+            SwitchRow("Ivás emlékeztető", waterOn) { waterOn = it; prefs.waterEnabled = it }
             if (waterOn) {
-                Stepper("Időköz (perc)", waterMin, 15, 240, 15) {
-                    waterMin = it; prefs.waterMinutes = it; applyChanges()
-                }
+                Stepper("Időköz (perc)", waterMin, 15, 240, 15) { waterMin = it; prefs.waterMinutes = it }
             }
         }
 
@@ -256,6 +315,18 @@ private fun SectionCard(title: String? = null, content: @Composable () -> Unit) 
 }
 
 @Composable
+private fun PermissionRow(granted: Boolean, grantedText: String, missingText: String, onFix: () -> Unit) {
+    if (granted) {
+        Text("✓ $grantedText", color = Muted, fontSize = 14.sp)
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(missingText, color = Muted, fontSize = 14.sp)
+            Button(onClick = onFix) { Text("Engedély megadása") }
+        }
+    }
+}
+
+@Composable
 private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f))
@@ -264,23 +335,64 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
 }
 
 @Composable
-private fun Stepper(
-    label: String, value: Int, min: Int, max: Int, step: Int, onChange: (Int) -> Unit,
-) {
+private fun Stepper(label: String, value: Int, min: Int, max: Int, step: Int, onChange: (Int) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f))
-        OutlinedButton(
-            onClick = { onChange((value - step).coerceAtLeast(min)) },
-            enabled = value > min,
-            colors = ButtonDefaults.outlinedButtonColors()
-        ) { Text("−") }
+        StepButton("−", enabled = value > min) { onChange((value - step).coerceAtLeast(min)) }
         Text(
             value.toString(), Modifier.padding(horizontal = 14.dp),
             fontSize = 18.sp, fontWeight = FontWeight.Bold
         )
-        OutlinedButton(
-            onClick = { onChange((value + step).coerceAtMost(max)) },
-            enabled = value < max
-        ) { Text("+") }
+        StepButton("+", enabled = value < max) { onChange((value + step).coerceAtMost(max)) }
+    }
+}
+
+/**
+ * Léptető gomb: egy érintés egyet lép, nyomva tartva folyamatosan, egyre gyorsabban változtat.
+ */
+@Composable
+private fun StepButton(label: String, enabled: Boolean, onStep: () -> Unit) {
+    // A nyomva tartás közben változik az érték, ezért mindig a legfrissebb lambdát kell hívni.
+    val currentStep by rememberUpdatedState(onStep)
+    val currentEnabled by rememberUpdatedState(enabled)
+    var pressed by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(20.dp)
+
+    Box(
+        Modifier
+            .size(width = 56.dp, height = 40.dp)
+            .clip(shape)
+            .background(if (pressed && enabled) Accent.copy(alpha = 0.25f) else Color.Transparent)
+            .border(1.dp, if (enabled) Muted else Muted.copy(alpha = 0.3f), shape)
+            .pointerInput(Unit) {
+                detectTapGestures(onPress = {
+                    if (!currentEnabled) return@detectTapGestures
+                    pressed = true
+                    currentStep()
+                    try {
+                        coroutineScope {
+                            val repeater = launch {
+                                delay(450)
+                                var n = 0
+                                while (currentEnabled) {
+                                    currentStep()
+                                    n++
+                                    delay(maxOf(35L, 140L - n * 6L))
+                                }
+                            }
+                            tryAwaitRelease()
+                            repeater.cancel()
+                        }
+                    } finally {
+                        pressed = false
+                    }
+                })
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label, fontSize = 22.sp,
+            color = if (enabled) Accent else Muted.copy(alpha = 0.4f)
+        )
     }
 }

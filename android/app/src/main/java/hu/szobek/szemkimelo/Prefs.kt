@@ -44,6 +44,10 @@ class Prefs(context: Context) {
         get() = int("water_minutes", 60)
         set(v) = sp.edit().putInt("water_minutes", v).apply()
 
+    var sound: Boolean
+        get() = bool("sound", true)
+        set(v) = sp.edit().putBoolean("sound", v).apply()
+
     var vibrate: Boolean
         get() = bool("vibrate", true)
         set(v) = sp.edit().putBoolean("vibrate", v).apply()

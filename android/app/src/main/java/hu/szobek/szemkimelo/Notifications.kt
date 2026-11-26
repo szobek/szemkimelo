@@ -6,13 +6,18 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.RingtoneManager
+import android.os.Build
 import android.text.format.DateFormat
 import androidx.core.app.NotificationCompat
 import java.util.Date
 
 object Notifications {
     private const val CH_SERVICE = "service"
-    private const val CH_ALERT = "alerts"
+    private const val CH_ALERT = "alerts" // hang nélküli (a hang kikapcsolt állapothoz)
+    private const val CH_ALERT_SOUND = "alerts_sound" // az alapértelmezett értesítési hanggal
+    private const val CH_BREAK = "break_alert" // a szünet teljes képernyős értesítése (hangot a szolgáltatás játssza)
 
     const val ID_FOREGROUND = 1
     const val ID_WATER = 2
@@ -28,13 +33,39 @@ object Notifications {
             }
         )
         nm.createNotificationChannel(
-            NotificationChannel(CH_ALERT, "Emlékeztetők", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Szünet, ivás és ebéd emlékeztetők (hang nélkül)"
+            NotificationChannel(CH_ALERT, "Emlékeztetők (hang nélkül)", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Ivás és ebéd emlékeztetők hang nélkül"
                 setSound(null, null)
                 enableVibration(false)
             }
         )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_ALERT_SOUND, "Emlékeztetők (hanggal)", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Ivás és ebéd emlékeztetők értesítési hanggal"
+                setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                enableVibration(false)
+            }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_BREAK, "Szünet jelzése", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "A 20 perc leteltekor megjelenő szünet-képernyő (zárolt képernyőn is)"
+                setSound(null, null)
+                enableVibration(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+        )
     }
+
+    /** Android 14-től a teljes képernyős értesítéshez (zárolt képernyős megjelenés) külön engedély kell. */
+    fun canUseFullScreenIntent(ctx: Context): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+            ctx.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
 
     private fun openApp(ctx: Context): PendingIntent = PendingIntent.getActivity(
         ctx, 0, Intent(ctx, MainActivity::class.java),
@@ -66,8 +97,11 @@ object Notifications {
             .build()
     }
 
-    private fun alertBuilder(ctx: Context, title: String, text: String) =
-        NotificationCompat.Builder(ctx, CH_ALERT)
+    private fun alertBuilder(
+        ctx: Context, title: String, text: String,
+        channel: String = if (Prefs(ctx).sound) CH_ALERT_SOUND else CH_ALERT,
+    ) =
+        NotificationCompat.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
@@ -100,14 +134,30 @@ object Notifications {
             .build()
     )
 
-    /** Ha nincs "megjelenítés más appok felett" engedély, értesítésként jelezzük a szünetet. */
-    fun breakFallback(ctx: Context, seconds: Int, workMinutes: Int) = show(
-        ctx, ID_BREAK,
-        alertBuilder(
+    /**
+     * A szünet értesítése. Zárolt képernyőn vagy kikapcsolt kijelzőnél a teljes képernyős értesítés
+     * ([fullScreen]) a [BreakActivity]-t indítja a zárolt képernyő fölött. Egyébként felugró
+     * értesítés (ha nincs "megjelenítés más appok felett" engedély).
+     * A hangot és a rezgést a szolgáltatás kezeli, ezért a csatorna néma.
+     */
+    fun breakAlert(ctx: Context, seconds: Int, workMinutes: Int, fullScreen: Boolean) {
+        val builder = alertBuilder(
             ctx, "👀 Letelt a $workMinutes perc!",
-            "Nézz egy ~6 méterre lévő dologra $seconds másodpercig, és pislogj néhányat."
-        ).setTimeoutAfter(seconds * 1000L).build()
-    )
+            "Nézz egy ~6 méterre lévő dologra $seconds másodpercig, és pislogj néhányat.",
+            channel = CH_BREAK
+        ).setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setTimeoutAfter(seconds * 1000L)
+
+        if (fullScreen) {
+            val activity = PendingIntent.getActivity(
+                ctx, 5, Intent(ctx, BreakActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            builder.setFullScreenIntent(activity, true)
+        }
+        show(ctx, ID_BREAK, builder.build())
+    }
 
     fun cancel(ctx: Context, id: Int) {
         ctx.getSystemService(NotificationManager::class.java).cancel(id)

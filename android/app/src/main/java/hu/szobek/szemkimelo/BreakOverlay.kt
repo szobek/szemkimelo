@@ -1,6 +1,7 @@
 package hu.szobek.szemkimelo
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
@@ -22,14 +23,13 @@ import kotlin.math.ceil
 import kotlin.math.sin
 
 /**
- * Teljes képernyős, sötétített visszaszámláló más appok felett (hang nélkül, pulzáló kerettel).
- * Működéséhez a "Megjelenítés más appok felett" engedély kell.
+ * A szünet-képernyő tartalma: kártya visszaszámlálóval, folyamatjelzővel és pulzáló kerettel.
+ * Ugyanezt használja az ablak más appok felett ([BreakOverlay]) és a zárolt képernyőn
+ * megjelenő [BreakActivity].
  */
-class BreakOverlay(private val ctx: Context) {
-    private val wm = ctx.getSystemService(WindowManager::class.java)
+class BreakContent(private val ctx: Context) {
     private val handler = Handler(Looper.getMainLooper())
 
-    private var root: FrameLayout? = null
     private var card: GradientDrawable? = null
     private var counter: TextView? = null
     private var progress: ProgressBar? = null
@@ -40,20 +40,22 @@ class BreakOverlay(private val ctx: Context) {
 
     private fun dp(v: Int) = (v * ctx.resources.displayMetrics.density).toInt()
 
-    private fun text(
-        value: String, sizeSp: Float, color: Int, bold: Boolean = false,
-    ) = TextView(ctx).apply {
-        text = value
-        textSize = sizeSp
-        setTextColor(color)
-        gravity = Gravity.CENTER
-        if (bold) setTypeface(typeface, Typeface.BOLD)
-    }
+    private fun text(value: String, sizeSp: Float, color: Int, bold: Boolean = false) =
+        TextView(ctx).apply {
+            text = value
+            textSize = sizeSp
+            setTextColor(color)
+            gravity = Gravity.CENTER
+            if (bold) setTypeface(typeface, Typeface.BOLD)
+        }
 
-    fun show(seconds: Int, workMinutes: Int, onDone: () -> Unit) {
+    private fun linear(top: Int = 0, width: Int = ViewGroup.LayoutParams.WRAP_CONTENT) =
+        LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(top) }
+
+    /** Felépíti a nézetet. A visszaszámlálás a [start] hívásra indul. */
+    fun build(seconds: Int, workMinutes: Int, backgroundColor: Int, onDone: () -> Unit): FrameLayout {
         this.onDone = onDone
         totalMs = seconds * 1000L
-        endAt = SystemClock.elapsedRealtime() + totalMs
 
         val cardBg = GradientDrawable().apply {
             setColor(BG)
@@ -70,13 +72,9 @@ class BreakOverlay(private val ctx: Context) {
         }
 
         content.addView(text("👀", 56f, Color.WHITE))
+        content.addView(text("Letelt a $workMinutes perc!", 28f, Color.WHITE, bold = true), linear(top = 8))
         content.addView(
-            text("Letelt a $workMinutes perc!", 28f, Color.WHITE, bold = true),
-            linear(top = 8)
-        )
-        content.addView(
-            text("Nézz egy ~6 méterre lévő dologra,\nés pislogj néhányat.", 17f, MUTED),
-            linear(top = 8)
+            text("Nézz egy ~6 méterre lévő dologra,\nés pislogj néhányat.", 17f, MUTED), linear(top = 8)
         )
         counter = text(seconds.toString(), 88f, ACCENT, bold = true).also {
             content.addView(it, linear(top = 12))
@@ -84,8 +82,8 @@ class BreakOverlay(private val ctx: Context) {
         progress = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = totalMs.toInt()
             this.progress = 0
-            progressTintList = android.content.res.ColorStateList.valueOf(ACCENT)
-            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(0xFF22345C.toInt())
+            progressTintList = ColorStateList.valueOf(ACCENT)
+            progressBackgroundTintList = ColorStateList.valueOf(0xFF22345C.toInt())
         }.also { content.addView(it, linear(top = 12, width = ViewGroup.LayoutParams.MATCH_PARENT)) }
 
         val skip = text("Kihagyom", 16f, Color.WHITE).apply {
@@ -97,8 +95,8 @@ class BreakOverlay(private val ctx: Context) {
         }
         content.addView(skip, linear(top = 20))
 
-        val frame = FrameLayout(ctx).apply {
-            setBackgroundColor(OVERLAY_BG)
+        return FrameLayout(ctx).apply {
+            setBackgroundColor(backgroundColor)
             isFocusableInTouchMode = true
             setOnKeyListener { _, keyCode, event ->
                 if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
@@ -112,24 +110,24 @@ class BreakOverlay(private val ctx: Context) {
                 ).apply { setMargins(dp(24), 0, dp(24), 0) }
             )
         }
-        root = frame
+    }
 
-        val params = WindowManager.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-            PixelFormat.TRANSLUCENT
-        )
-        wm.addView(frame, params)
-        frame.requestFocus()
+    fun start() {
+        endAt = SystemClock.elapsedRealtime() + totalMs
         handler.post(tick)
     }
 
-    private fun linear(top: Int = 0, width: Int = ViewGroup.LayoutParams.WRAP_CONTENT) =
-        LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(top) }
+    fun stop() {
+        handler.removeCallbacks(tick)
+    }
+
+    /** Kihagyás vagy lejárat: leállítja a számlálót, és egyszer jelez a hívónak. */
+    fun finish() {
+        if (done) return
+        done = true
+        stop()
+        onDone?.invoke()
+    }
 
     private val tick = object : Runnable {
         override fun run() {
@@ -148,16 +146,51 @@ class BreakOverlay(private val ctx: Context) {
         }
     }
 
-    private fun finish() {
-        if (done) return
-        done = true
-        dismiss()
-        onDone?.invoke()
+    companion object {
+        val BG = 0xFF14213D.toInt()
+        val ACCENT = 0xFF4CC9F0.toInt()
+        val GOLD = 0xFFFFD166.toInt()
+        val MUTED = 0xFFA9B4C9.toInt()
+        val OVERLAY_BG = 0xE6050A14.toInt()
+        val SOLID_BG = 0xFF050A14.toInt()
+    }
+}
+
+/**
+ * Sötétített visszaszámláló ablak más appok felett (a "Megjelenítés más appok felett" engedéllyel).
+ * Zárolt képernyő fölé nem kerülhet, oda a [BreakActivity] való.
+ */
+class BreakOverlay(private val ctx: Context) {
+    private val wm = ctx.getSystemService(WindowManager::class.java)
+    private var content: BreakContent? = null
+    private var root: View? = null
+
+    fun show(seconds: Int, workMinutes: Int, onDone: () -> Unit) {
+        val c = BreakContent(ctx)
+        content = c
+        val view = c.build(seconds, workMinutes, BreakContent.OVERLAY_BG) {
+            dismiss()
+            onDone()
+        }
+        root = view
+
+        val params = WindowManager.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+            PixelFormat.TRANSLUCENT
+        )
+        wm.addView(view, params)
+        view.requestFocus()
+        c.start()
     }
 
     /** Eltávolítja az ablakot (többször is hívható). */
     fun dismiss() {
-        handler.removeCallbacks(tick)
+        content?.stop()
         root?.let {
             try {
                 wm.removeView(it)
@@ -165,13 +198,5 @@ class BreakOverlay(private val ctx: Context) {
             }
         }
         root = null
-    }
-
-    private companion object {
-        val BG = 0xFF14213D.toInt()
-        val ACCENT = 0xFF4CC9F0.toInt()
-        val GOLD = 0xFFFFD166.toInt()
-        val MUTED = 0xFFA9B4C9.toInt()
-        val OVERLAY_BG = 0xE6050A14.toInt()
     }
 }
