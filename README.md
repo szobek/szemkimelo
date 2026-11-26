@@ -9,6 +9,10 @@ egy kb. 6 méterre (20 láb) lévő dologra, hogy pihenjen a szemed.
 - Hang nélküli, feltűnő figyelmeztetés a 20 perc leteltekor: sötétített képernyő
   (minden monitoron), nagy visszaszámlálás, pulzáló keret
 - Szünet kihagyható (`Esc` vagy gomb)
+- **Ebéd emlékeztető** beállítható időponttal (naponta egyszer, a megadott időponttól
+  30 percen belül; elhalasztható 10 percre)
+- **Ivás emlékeztető** óránként (az időköz 15–240 perc között állítható), kis
+  felugró ablakban a jobb alsó sarokban; magától eltűnik
 - Szüneteltetés, újraindítás, azonnali szünet a tálcamenüből
 - Ha a szünet hosszánál tovább nem használod a gépet, az időzítő magától újraindul
 - Beállítható munkaidő, szünethossz, teljes képernyős mód és indítás a Windows-szal

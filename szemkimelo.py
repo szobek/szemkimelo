@@ -13,6 +13,7 @@ import queue
 import sys
 import time
 import tkinter as tk
+from datetime import datetime
 from tkinter import ttk
 
 import pystray
@@ -34,7 +35,22 @@ DEFAULTS = {
     "break_seconds": 20,
     "fullscreen": True,
     "autostart": False,
+    "lunch_enabled": True,
+    "lunch_time": "12:00",
+    "water_enabled": True,
+    "water_minutes": 60,
 }
+
+
+def parse_hhmm(text: str, default: tuple[int, int] = (12, 0)) -> tuple[int, int]:
+    try:
+        h, m = str(text).split(":")
+        h, m = int(h), int(m)
+        if 0 <= h <= 23 and 0 <= m <= 59:
+            return h, m
+    except ValueError:
+        pass
+    return default
 
 # Színek
 OVERLAY_BG = "#050a14"
@@ -165,6 +181,9 @@ class App:
 
         self.state = "working"  # working | paused | break
         self.next_break = time.monotonic() + self.work_secs
+        self.next_water = time.monotonic() + self.water_secs
+        self.lunch_done_date = None
+        self.reminder_win: tk.Toplevel | None = None
         self.paused_remaining = 0.0
         self.break_end = 0.0
         self.break_win: tk.Toplevel | None = None
@@ -266,6 +285,10 @@ class App:
     def break_secs(self) -> int:
         return int(self.cfg["break_seconds"])
 
+    @property
+    def water_secs(self) -> int:
+        return int(self.cfg["water_minutes"]) * 60
+
     # ---- tálca menü (a pystray saját szálán fut, ezért csak sorba teszünk)
     def build_menu(self) -> pystray.Menu:
         return pystray.Menu(
@@ -312,12 +335,108 @@ class App:
         elif self.state == "break":
             self.update_break(now)
 
+        if self.state != "break":
+            self.check_reminders(now)
+
         self.icon.title = f"{APP_NAME} – {self.remaining_text()}"
         self.update_main()
         self.root.after(80 if self.state == "break" else 250, self.tick)
 
+    def check_reminders(self, now: float) -> None:
+        if self.reminder_win is not None:
+            return
+        # Ebéd: a beállított időponttól számított 30 percen belül, naponta egyszer.
+        if self.cfg["lunch_enabled"]:
+            today = datetime.now()
+            lh, lm = parse_hhmm(self.cfg["lunch_time"])
+            since = (today.hour * 60 + today.minute) - (lh * 60 + lm)
+            if 0 <= since < 30 and self.lunch_done_date != today.date():
+                self.lunch_done_date = today.date()
+                self.show_reminder("lunch")
+                return
+        # Ivás: csak munka közben, és ha éppen nem állt fel a gép mellől.
+        if (self.cfg["water_enabled"] and self.state == "working"
+                and now >= self.next_water and idle_seconds() < 300):
+            self.next_water = now + self.water_secs
+            self.show_reminder("water")
+
+    REMINDERS = {
+        "lunch": ("🍽️", "Ebédidő!", "Állj fel, egyél valami jót,\nés pihentesd a szemed is.", "#ff9f1c"),
+        "water": ("💧", "Igyál egy pohár vizet!", "Frissítsd fel magad,\nés mozgasd meg a nyakad.", "#4cc9f0"),
+    }
+
+    def show_reminder(self, kind: str) -> None:
+        self.close_reminder()
+        emoji, title, text, color = self.REMINDERS[kind]
+
+        win = tk.Toplevel(self.root)
+        self.reminder_win = win
+        win.overrideredirect(True)
+        win.withdraw()
+        win.attributes("-topmost", True)
+        win.configure(bg=color)
+        inner = tk.Frame(win, bg=BG)
+        inner.pack(padx=5, pady=5)
+
+        big = kind == "lunch"
+        tk.Label(inner, text=emoji, font=("Segoe UI Emoji", 44 if big else 32), bg=BG, fg=FG).pack(
+            padx=50, pady=(22 if big else 14, 0))
+        tk.Label(inner, text=title, font=("Segoe UI", 28 if big else 18, "bold"), bg=BG, fg=FG).pack(
+            padx=30, pady=(6, 4))
+        tk.Label(inner, text=text, font=("Segoe UI", 15 if big else 11), bg=BG, fg=MUTED,
+                 justify="center").pack(padx=30)
+
+        row = tk.Frame(inner, bg=BG)
+        row.pack(pady=(14, 20 if big else 14))
+
+        def mkbtn(label, cmd):
+            tk.Button(row, text=label, command=cmd, font=("Segoe UI", 11), bg="#22345c", fg=FG,
+                      activebackground="#2c4378", activeforeground=FG, relief="flat",
+                      padx=16, pady=5).pack(side="left", padx=5)
+
+        mkbtn("Rendben", self.close_reminder)
+        if kind == "lunch":
+            mkbtn("Később (10 perc)", lambda: self.snooze_lunch())
+        win.bind("<Escape>", lambda e: self.close_reminder())
+
+        win.update_idletasks()
+        w, h = win.winfo_reqwidth(), win.winfo_reqheight()
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        if big:   # ebéd: képernyő közepén
+            x, y = (sw - w) // 2, (sh - h) // 2
+        else:     # ivás: jobb alsó sarokban, a tálca felett
+            x, y = sw - w - 30, sh - h - 90
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        win.deiconify()
+        win.lift()
+
+        started = time.monotonic()
+
+        def pulse() -> None:
+            if self.reminder_win is not win:
+                return
+            k = (math.sin((time.monotonic() - started) * 4) + 1) / 2
+            win.config(bg=blend(color, "#ffffff", k * 0.7))
+            win.after(80, pulse)
+
+        pulse()
+        if kind == "water":  # az ivás emlékeztető magától eltűnik
+            win.after(25000, lambda: self.close_reminder() if self.reminder_win is win else None)
+
+    def close_reminder(self) -> None:
+        if self.reminder_win is not None:
+            win, self.reminder_win = self.reminder_win, None
+            win.destroy()
+
+    def snooze_lunch(self) -> None:
+        self.close_reminder()
+        self.root.after(10 * 60 * 1000, lambda: self.events.put("reminder:lunch"))
+
     def handle(self, event: str) -> None:
-        if event == "show":
+        if event.startswith("reminder:"):
+            if self.state != "break":
+                self.show_reminder(event.split(":", 1)[1])
+        elif event == "show":
             self.show_main()
         elif event == "break_now":
             if self.state != "break":
@@ -345,6 +464,7 @@ class App:
 
     # ---- szünet ablak
     def start_break(self) -> None:
+        self.close_reminder()
         self.state = "break"
         self.break_end = time.monotonic() + self.break_secs
 
@@ -460,8 +580,33 @@ class App:
         ttk.Spinbox(frm, from_=5, to=300, width=6, textvariable=break_var).grid(row=1, column=1, **pad)
         ttk.Checkbutton(frm, text="Teljes képernyős figyelmeztetés", variable=full_var).grid(
             row=2, column=0, columnspan=2, sticky="w", **pad)
+
+        ttk.Separator(frm).grid(row=3, column=0, columnspan=2, sticky="ew", padx=14, pady=4)
+
+        lh, lm = parse_hhmm(self.cfg["lunch_time"])
+        lunch_en = tk.BooleanVar(value=self.cfg["lunch_enabled"])
+        lunch_h = tk.StringVar(value=f"{lh:02d}")
+        lunch_m = tk.StringVar(value=f"{lm:02d}")
+        ttk.Checkbutton(frm, text="Ebéd emlékeztető", variable=lunch_en).grid(
+            row=4, column=0, sticky="w", **pad)
+        tfrm = ttk.Frame(frm)
+        tfrm.grid(row=4, column=1, **pad)
+        ttk.Spinbox(tfrm, from_=0, to=23, width=3, format="%02.0f", wrap=True,
+                    textvariable=lunch_h).pack(side="left")
+        ttk.Label(tfrm, text=":").pack(side="left")
+        ttk.Spinbox(tfrm, from_=0, to=59, width=3, format="%02.0f", wrap=True,
+                    textvariable=lunch_m).pack(side="left")
+
+        water_en = tk.BooleanVar(value=self.cfg["water_enabled"])
+        water_min = tk.IntVar(value=self.cfg["water_minutes"])
+        ttk.Checkbutton(frm, text="Ivás emlékeztető (percenként):", variable=water_en).grid(
+            row=5, column=0, sticky="w", **pad)
+        ttk.Spinbox(frm, from_=15, to=240, increment=15, width=6,
+                    textvariable=water_min).grid(row=5, column=1, **pad)
+
+        ttk.Separator(frm).grid(row=6, column=0, columnspan=2, sticky="ew", padx=14, pady=4)
         ttk.Checkbutton(frm, text="Indítás a Windows-szal", variable=auto_var).grid(
-            row=3, column=0, columnspan=2, sticky="w", **pad)
+            row=7, column=0, columnspan=2, sticky="w", **pad)
 
         def close() -> None:
             self.settings_win = None
@@ -471,11 +616,23 @@ class App:
             try:
                 work = max(1, min(180, int(work_var.get())))
                 brk = max(5, min(300, int(break_var.get())))
+                water = max(15, min(240, int(water_min.get())))
+                lunch_hour = max(0, min(23, int(lunch_h.get())))
+                lunch_min = max(0, min(59, int(lunch_m.get())))
             except (tk.TclError, ValueError):
                 return
             changed = work != self.cfg["work_minutes"]
+            water_changed = water != self.cfg["water_minutes"]
+            old_lunch = self.cfg["lunch_time"]
             self.cfg.update(work_minutes=work, break_seconds=brk,
-                            fullscreen=bool(full_var.get()), autostart=bool(auto_var.get()))
+                            fullscreen=bool(full_var.get()), autostart=bool(auto_var.get()),
+                            lunch_enabled=bool(lunch_en.get()),
+                            lunch_time=f"{lunch_hour:02d}:{lunch_min:02d}",
+                            water_enabled=bool(water_en.get()), water_minutes=water)
+            if water_changed:
+                self.next_water = time.monotonic() + self.water_secs
+            if self.cfg["lunch_time"] != old_lunch:
+                self.lunch_done_date = None
             save_config(self.cfg)
             try:
                 set_autostart(self.cfg["autostart"])
@@ -486,7 +643,7 @@ class App:
             close()
 
         btns = ttk.Frame(frm)
-        btns.grid(row=4, column=0, columnspan=2, pady=(10, 0))
+        btns.grid(row=8, column=0, columnspan=2, pady=(10, 0))
         ttk.Button(btns, text="Mentés", command=save).pack(side="left", padx=4)
         ttk.Button(btns, text="Mégse", command=close).pack(side="left", padx=4)
         win.protocol("WM_DELETE_WINDOW", close)
