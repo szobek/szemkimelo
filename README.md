@@ -120,7 +120,13 @@ Natív Kotlin + Jetpack Compose app, ugyanazokkal az alapfunkciókkal. Részlete
 
 1. Töltsd le az APK-t a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.1) oldalról.
 2. Nyisd meg, és engedélyezd az ismeretlen forrásból való telepítést.
-3. Indítsd el, nyomd meg az `Indítás` gombot, és add meg a kért engedélyeket.
+3. Ha a Google Play Protect `Kártékony alkalmazás letiltva` figyelmeztetést ad, koppints a **`Telepítés mégis`**
+   lehetőségre. Ez téves riasztás: az app nem szerepel a Play Áruházban, és nem a Google által ismert
+   kulccsal van aláírva. A kód nyílt, az app nem használ internetet és nem gyűjt adatot.
+4. Indítsd el, nyomd meg az `Indítás` gombot, és add meg a kért engedélyeket.
+5. **Kapcsold ki az akkumulátor-optimalizálást is** (a főképernyőn az `Engedély megadása` gomb az utolsó
+   engedélysornál). Ez nélkül a telefon késleltetheti vagy leállíthatja az időzítőt, és a szünet nem jelenik
+   meg megbízhatóan.
 
 ---
 
@@ -142,6 +148,13 @@ A `%APPDATA%\Szemkimelo\config.json` fájlba. Ennek törlésével visszaáll az 
 **Hogyan lehet teljesen eltávolítani a Windowsos appot?**
 Kapcsold ki az `Indítás a Windows-szal` opciót, lépj ki az appból, majd töröld az exe-t és a
 `%APPDATA%\Szemkimelo` mappát.
+
+**Az Android telepítésnél „Kártékony alkalmazás letiltva” üzenetet kapok. Mit tegyek?**
+Koppints a `Telepítés mégis` lehetőségre. A Play Protect téves riasztása, mert az app nincs a Play Áruházban.
+
+**Az Androidos szünet néha nem jelenik meg. Miért?**
+Valószínűleg az akkumulátor-optimalizálás késlelteti vagy leállítja az időzítőt. Kapcsold ki az app számára a
+főképernyőn lévő `Engedély megadása` gombbal.
 
 **Miért nem jelenik meg az Android szünet a lezárt képernyő felett?**
 Android 14-től a `Teljes képernyős értesítések` engedélyt kézzel kell megadni. Az app a főképernyőn jelzi, ha

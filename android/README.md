@@ -36,10 +36,23 @@ vízivás-emlékeztetővel. Natív Kotlin + Jetpack Compose app.
 1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.1)
    oldalról.
 2. Nyisd meg a telefonon, és engedélyezd az ismeretlen forrásból való telepítést.
-3. Indítsd el az appot, nyomd meg az `Indítás` gombot, és add meg a kért engedélyeket.
+3. Ha a Google Play Protect `Kártékony alkalmazás letiltva` figyelmeztetést ad, koppints a **`Telepítés mégis`**
+   lehetőségre (lásd lent).
+4. Indítsd el az appot, nyomd meg az `Indítás` gombot, és add meg a kért engedélyeket.
+5. **Fontos:** a főképernyőn kapcsold ki az akkumulátor-optimalizálást is (`Engedély megadása` az utolsó
+   engedélysornál). Ez nélkül a telefon késleltetheti vagy leállíthatja az időzítőt a háttérben, és a szünet
+   nem jelenik meg megbízhatóan.
 
-Követelmény: Android 8.0 (API 26) vagy újabb. A Play Protect figyelmeztethet, mert az APK nincs a Play
-Áruházban.
+Követelmény: Android 8.0 (API 26) vagy újabb.
+
+### Play Protect figyelmeztetés
+
+Az app nincs a Play Áruházban, és az APK nem a Google által ismert fejlesztői kulccsal van aláírva, ezért a
+Play Protect ismeretlen alkalmazásként kezeli, és a kért érzékeny engedélyek (megjelenés más appok felett,
+teljes képernyős értesítés, pontos ébresztő) miatt figyelmeztethet. Ez téves riasztás: az app nyílt
+forráskódú, nem használ internetet, és nem gyűjt adatot. Telepíteni a **`Telepítés mégis`** lehetőséggel lehet.
+Ha ez nem jelenik meg, kapcsold ki ideiglenesen az `Alkalmazások vizsgálata a Play Protecttel` beállítást
+(Play Áruház → profilkép → Play Protect → fogaskerék), telepítsd az appot, és utána kapcsold vissza.
 
 ## Engedélyek
 
@@ -48,7 +61,7 @@ Követelmény: Android 8.0 (API 26) vagy újabb. A Play Protect figyelmeztethet,
 | Értesítések | ivás és ebéd emlékeztető, a futás jelzése |
 | Megjelenítés más appok felett | teljes képernyős visszaszámláló használat közben (nélküle csak értesítést kapsz) |
 | Teljes képernyős értesítések | a visszaszámláló zárolt képernyő felett (Android 14+: kézzel kell engedélyezni, az app jelzi) |
-| Akkumulátor-optimalizálás kikapcsolása | az időzítő ne késsen és ne álljon le a háttérben (ajánlott, az app jelzi) |
+| Akkumulátor-optimalizálás kikapcsolása | az időzítő ne késsen és ne álljon le a háttérben (**a megbízható megjelenéshez kell**, az app jelzi) |
 | Pontos ébresztők | az emlékeztetők pontos időzítése (automatikusan megkapja) |
 | Előtér-szolgáltatás | az időzítő folyamatos futása a háttérben |
 | Indítás újraindítás után | az emlékeztetők folytatása a telefon újraindítása után |
