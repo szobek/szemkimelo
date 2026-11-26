@@ -15,8 +15,8 @@ Mellé ebéd- és vízivás-emlékeztetőt is ad.
 
 | Platform | Letöltés | Mit kell tudni |
 |---|---|---|
-| 🪟 **Windows** | [Szemkimelo.exe – v1.1.1](https://github.com/szobek/szemkimelo/releases/tag/v1.1.1) | Önállóan fut, Python nem kell hozzá |
-| 🤖 **Android** | [Szemkimelo-android.apk – v1.0.1](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.1) | Android 8.0 vagy újabb, oldaltöltéssel telepíthető |
+| 🪟 **Windows** | [Szemkimelo.exe – v1.1.2](https://github.com/szobek/szemkimelo/releases/tag/v1.1.2) | Önállóan fut, Python nem kell hozzá |
+| 🤖 **Android** | [Szemkimelo-android.apk – v1.0.2](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.2) | Android 8.0 vagy újabb, oldaltöltéssel telepíthető |
 
 Az app **nem használ internetet**, nem gyűjt és nem küld adatot. A Windowsos változat beállításai egyetlen
 helyi fájlban vannak, az Androidos az app saját tárolójában.
@@ -118,7 +118,9 @@ Natív Kotlin + Jetpack Compose app, ugyanazokkal az alapfunkciókkal. Részlete
 
 ### Telepítés
 
-1. Töltsd le az APK-t a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.1) oldalról.
+1. Töltsd le az APK-t a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.2) oldalról. Ha az 1.0.1-es vagy régebbi
+   verzió van fent, előbb töröld le (a v1.0.2-től az APK saját, állandó kulccsal van aláírva, ezért ez egyszer
+   szükséges; a későbbi frissítések már a telepített fölé kerülnek).
 2. Nyisd meg, és engedélyezd az ismeretlen forrásból való telepítést.
 3. Ha a Google Play Protect `Kártékony alkalmazás letiltva` figyelmeztetést ad, koppints a **`Telepítés mégis`**
    lehetőségre. Ez téves riasztás: az app nem szerepel a Play Áruházban, és nem a Google által ismert

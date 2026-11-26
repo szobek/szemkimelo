@@ -33,8 +33,9 @@ vízivás-emlékeztetővel. Natív Kotlin + Jetpack Compose app.
 
 ## Telepítés (APK)
 
-1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.1)
-   oldalról.
+1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.2)
+   oldalról. Ha az 1.0.1-es vagy régebbi verzió van fent, előbb töröld le (a v1.0.2-től az APK saját,
+   állandó kulccsal van aláírva, ezért ez egyszer szükséges; a későbbi frissítések már a telepített fölé kerülnek).
 2. Nyisd meg a telefonon, és engedélyezd az ismeretlen forrásból való telepítést.
 3. Ha a Google Play Protect `Kártékony alkalmazás letiltva` figyelmeztetést ad, koppints a **`Telepítés mégis`**
    lehetőségre (lásd lent).
@@ -102,8 +103,8 @@ Ha a szünet nem jelenik meg, vagy késik:
   Ilyenkor nyisd meg újra az appot, és nyomd meg az `Indítás` gombot.
 - Egyes gyártók (pl. Xiaomi, Huawei, Samsung) agresszíven leállítják a háttérfolyamatokat. Ilyenkor érdemes az
   appot kivenni az akkumulátor-optimalizálásból.
-- A release APK jelenleg a debug kulccsal van aláírva, ami oldaltöltéshez (sideload) elég. Play Áruházhoz külön
-  feltöltési kulcs kellene.
+- A release APK saját kulccsal van aláírva, ami oldaltöltéshez (sideload) elég. A Play Áruházba feltöltéshez
+  a Google külön kulcskezelést (Play App Signing) és AAB formátumot kér.
 
 ## Fejlesztés
 
