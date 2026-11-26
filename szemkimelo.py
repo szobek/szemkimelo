@@ -53,6 +53,7 @@ def parse_hhmm(text: str, default: tuple[int, int] = (12, 0)) -> tuple[int, int]
     return default
 
 # Színek
+IDLE_RESET_SECS = 300  # ennyi bevitel nélküli idő után számít "elment a gép mellől"-nek
 OVERLAY_BG = "#050a14"
 BG = "#14213d"
 FG = "#ffffff"
@@ -117,8 +118,9 @@ def idle_seconds() -> float:
     info.cbSize = ctypes.sizeof(info)
     if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
         return 0.0
-    millis = ctypes.windll.kernel32.GetTickCount() - info.dwTime
-    return max(0, millis) / 1000.0
+    # Mindkét érték 32 bites előjel nélküli ezredmásodperc (kb. 49 naponként túlcsordul).
+    millis = (ctypes.windll.kernel32.GetTickCount() - info.dwTime) & 0xFFFFFFFF
+    return millis / 1000.0
 
 
 def autostart_command() -> str:
@@ -327,8 +329,10 @@ class App:
 
         now = time.monotonic()
         if self.state == "working":
-            # Ha a felhasználó már eleget pihent (nem érintette a gépet), nullázunk.
-            if idle_seconds() >= self.break_secs:
+            # Ha a felhasználó elment a gép mellől (hosszú ideje nincs bevitel), az
+            # már pihenésnek számít, ezért nullázunk. Olvasás/videó közben a bevitel
+            # szünetelhet, ezért ez a küszöb jóval hosszabb a szünetnél.
+            if idle_seconds() >= IDLE_RESET_SECS:
                 self.next_break = now + self.work_secs
             elif now >= self.next_break:
                 self.start_break()
@@ -356,7 +360,7 @@ class App:
                 return
         # Ivás: csak munka közben, és ha éppen nem állt fel a gép mellől.
         if (self.cfg["water_enabled"] and self.state == "working"
-                and now >= self.next_water and idle_seconds() < 300):
+                and now >= self.next_water and idle_seconds() < IDLE_RESET_SECS):
             self.next_water = now + self.water_secs
             self.show_reminder("water")
 
