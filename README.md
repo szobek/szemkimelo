@@ -20,6 +20,11 @@ egy kb. 6 méterre (20 láb) lévő dologra, hogy pihenjen a szemed.
 
 A beállítások itt vannak: `%APPDATA%\Szemkimelo\config.json`
 
+## Android
+
+Az `android/` mappában van az Android változat (Kotlin + Jetpack Compose), ugyanazokkal a funkciókkal:
+szünet, ivás és ebéd emlékeztető. Részletek: [android/README.md](android/README.md).
+
 ## Futtatás forrásból
 
 Követelmény: Python 3.10+ (Windows).
