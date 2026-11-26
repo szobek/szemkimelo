@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -94,6 +95,23 @@ private fun openOverlaySettings(ctx: Context) = ctx.startActivity(
     Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}"))
 )
 
+private fun isIgnoringBatteryOptimizations(ctx: Context): Boolean =
+    ctx.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName)
+
+/** Kéri az akkumulátor-optimalizálás kikapcsolását (ha a rendszer nem engedi, a listát nyitja meg). */
+private fun requestIgnoreBatteryOptimizations(ctx: Context) {
+    try {
+        ctx.startActivity(
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))
+        )
+    } catch (_: Exception) {
+        ctx.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+    }
+}
+
+private fun fmtClock(ms: Long): String =
+    java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(ms))
+
 private fun openFullScreenIntentSettings(ctx: Context) {
     if (Build.VERSION.SDK_INT >= 34) {
         ctx.startActivity(
@@ -122,6 +140,10 @@ private fun MainScreen() {
     var nextBreak by remember { mutableLongStateOf(prefs.nextBreakAt) }
     var canDraw by remember { mutableStateOf(Settings.canDrawOverlays(ctx)) }
     var canFullScreen by remember { mutableStateOf(Notifications.canUseFullScreenIntent(ctx)) }
+    var batteryOk by remember { mutableStateOf(isIgnoringBatteryOptimizations(ctx)) }
+    var lastFired by remember { mutableLongStateOf(prefs.lastBreakFired) }
+    var lastPlanned by remember { mutableLongStateOf(prefs.lastBreakPlanned) }
+    var lastMode by remember { mutableStateOf(prefs.lastBreakMode) }
     var showPermissionDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -131,6 +153,10 @@ private fun MainScreen() {
             running = prefs.running
             canDraw = Settings.canDrawOverlays(ctx)
             canFullScreen = Notifications.canUseFullScreenIntent(ctx)
+            batteryOk = isIgnoringBatteryOptimizations(ctx)
+            lastFired = prefs.lastBreakFired
+            lastPlanned = prefs.lastBreakPlanned
+            lastMode = prefs.lastBreakMode
             delay(500)
         }
     }
@@ -238,11 +264,26 @@ private fun MainScreen() {
                             running = false
                         }) { Text("Leállítás") }
                     }
+                    TextButton(onClick = {
+                        ReminderService.send(ctx, ReminderService.ACTION_TEST)
+                    }) { Text("Teszt: szünet 10 mp múlva") }
                 } else {
                     Button(onClick = {
                         if (!canDraw || !canFullScreen) showPermissionDialog = true
                         else requestNotificationsThenStart()
                     }) { Text("Indítás") }
+                }
+                if (lastFired > 0L) {
+                    Spacer(Modifier.height(6.dp))
+                    val delay = if (lastPlanned > 0L) ((lastFired - lastPlanned) / 1000) else null
+                    Text(
+                        buildString {
+                            append("Utolsó szünet: ${fmtClock(lastFired)}")
+                            if (delay != null) append(" (késés: $delay mp)")
+                            if (lastMode.isNotEmpty()) append("\n$lastMode")
+                        },
+                        color = Muted, fontSize = 12.sp, textAlign = TextAlign.Center
+                    )
                 }
             }
         }
@@ -260,6 +301,12 @@ private fun MainScreen() {
                 grantedText = "Zárolt képernyőn: engedélyezve",
                 missingText = "Zárolt képernyőn: nincs engedélyezve. Nélküle a szünet zárolt telefonon csak értesítésként jön.",
                 onFix = { openFullScreenIntentSettings(ctx) }
+            )
+            PermissionRow(
+                granted = batteryOk,
+                grantedText = "Akkumulátor-optimalizálás kikapcsolva",
+                missingText = "Az akkumulátor-optimalizálás késleltetheti vagy leállíthatja az időzítőt a háttérben.",
+                onFix = { requestIgnoreBatteryOptimizations(ctx) }
             )
         }
 

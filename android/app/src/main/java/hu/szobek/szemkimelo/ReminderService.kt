@@ -58,6 +58,12 @@ class ReminderService : Service() {
             }
             ACTION_RESTORE -> updateForeground()
             Scheduler.ACTION_BREAK, ACTION_BREAK_NOW -> handleBreak()
+            ACTION_TEST -> if (!breakActive) {
+                // Teszt: valódi ébresztővel, 10 másodperc múlva indul a szünet (közben át lehet váltani másik appra).
+                prefs.nextBreakAt = now + 10_000L
+                Scheduler.set(this, Scheduler.ACTION_BREAK, prefs.nextBreakAt)
+                updateForeground()
+            }
             ACTION_BREAK_FINISHED -> if (breakActive) finishBreak()
             Scheduler.ACTION_WATER -> {
                 if (prefs.waterEnabled) {
@@ -125,12 +131,15 @@ class ReminderService : Service() {
 
     private fun startBreak() {
         breakActive = true
+        prefs.lastBreakPlanned = prefs.nextBreakAt
+        prefs.lastBreakFired = System.currentTimeMillis()
         prefs.nextBreakAt = 0
         updateForeground()
         if (prefs.vibrate) vibrate()
         if (prefs.sound) playSound()
 
         if (!deviceReady()) {
+            prefs.lastBreakMode = "zárolt képernyő (értesítés)"
             // Zárolt képernyő vagy kikapcsolt kijelző: teljes képernyős értesítés indítja a szünet-képernyőt
             // a zárolt képernyő fölött (felkapcsolja a kijelzőt is). Az Activity lejárati biztosítékkal fut.
             Notifications.breakAlert(
@@ -146,7 +155,13 @@ class ReminderService : Service() {
                 it.show(prefs.breakSeconds, prefs.workMinutes) { finishBreak() }
             }
         }.isSuccess
-        if (!shown) {
+        prefs.lastBreakMode = if (shown) "overlay + értesítés" else "csak értesítés (nincs overlay)"
+        if (shown) {
+            // Egyes appok (pl. rendszerbeállítások, bizonyos közösségi appok) elrejtik a más appok feletti
+            // ablakokat, amíg előtérben vannak. Ilyenkor az overlay nem látszik, ezért mellé felugró
+            // értesítést is küldünk, ami minden app felett megjelenik; koppintásra teljes képernyős lesz.
+            Notifications.breakAlert(this, prefs.breakSeconds, prefs.workMinutes, fullScreen = false)
+        } else {
             // Nincs engedély (vagy a rendszer elutasította az ablakot): felugró értesítéssel jelzünk.
             overlay?.dismiss()
             overlay = null
@@ -242,6 +257,7 @@ class ReminderService : Service() {
         const val ACTION_RESCHEDULE = "hu.szobek.szemkimelo.action.RESCHEDULE"
         const val ACTION_RESTORE = "hu.szobek.szemkimelo.action.RESTORE"
         const val ACTION_BREAK_NOW = "hu.szobek.szemkimelo.action.BREAK_NOW"
+        const val ACTION_TEST = "hu.szobek.szemkimelo.action.TEST"
         const val ACTION_BREAK_FINISHED = "hu.szobek.szemkimelo.action.BREAK_FINISHED"
         const val ACTION_LUNCH_SNOOZE = "hu.szobek.szemkimelo.action.LUNCH_SNOOZE"
         const val ACTION_LUNCH_DONE = "hu.szobek.szemkimelo.action.LUNCH_DONE"

@@ -52,6 +52,19 @@ class Prefs(context: Context) {
         get() = bool("vibrate", true)
         set(v) = sp.edit().putBoolean("vibrate", v).apply()
 
+    /** Diagnosztika: az utolsó szünet tervezett és tényleges indulása (ms), valamint a megjelenítés módja. */
+    var lastBreakPlanned: Long
+        get() = long("last_break_planned", 0L)
+        set(v) = sp.edit().putLong("last_break_planned", v).apply()
+
+    var lastBreakFired: Long
+        get() = long("last_break_fired", 0L)
+        set(v) = sp.edit().putLong("last_break_fired", v).apply()
+
+    var lastBreakMode: String
+        get() = sp.getString("last_break_mode", "") ?: ""
+        set(v) = sp.edit().putString("last_break_mode", v).apply()
+
     /** A következő szünet időpontja (ms, óra szerint); 0 = éppen szünet van / nincs tervezve. */
     var nextBreakAt: Long
         get() = long("next_break_at", 0L)

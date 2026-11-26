@@ -149,13 +149,14 @@ object Notifications {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setTimeoutAfter(seconds * 1000L)
 
-        if (fullScreen) {
-            val activity = PendingIntent.getActivity(
-                ctx, 5, Intent(ctx, BreakActivity::class.java),
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            builder.setFullScreenIntent(activity, true)
-        }
+        // Koppintásra a teljes képernyős szünet-képernyő nyílik meg (ez egyes appok felett is látszik,
+        // ahol a rendszer elrejti a más appok feletti ablakokat).
+        val activity = PendingIntent.getActivity(
+            ctx, 5, Intent(ctx, BreakActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        builder.setContentIntent(activity)
+        if (fullScreen) builder.setFullScreenIntent(activity, true)
         show(ctx, ID_BREAK, builder.build())
     }
 

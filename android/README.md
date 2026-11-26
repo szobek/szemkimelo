@@ -48,6 +48,7 @@ Követelmény: Android 8.0 (API 26) vagy újabb. A Play Protect figyelmeztethet,
 | Értesítések | ivás és ebéd emlékeztető, a futás jelzése |
 | Megjelenítés más appok felett | teljes képernyős visszaszámláló használat közben (nélküle csak értesítést kapsz) |
 | Teljes képernyős értesítések | a visszaszámláló zárolt képernyő felett (Android 14+: kézzel kell engedélyezni, az app jelzi) |
+| Akkumulátor-optimalizálás kikapcsolása | az időzítő ne késsen és ne álljon le a háttérben (ajánlott, az app jelzi) |
 | Pontos ébresztők | az emlékeztetők pontos időzítése (automatikusan megkapja) |
 | Előtér-szolgáltatás | az időzítő folyamatos futása a háttérben |
 | Indítás újraindítás után | az emlékeztetők folytatása a telefon újraindítása után |
@@ -64,7 +65,23 @@ egy koppintással a megfelelő rendszerbeállításhoz visz.
   nem takarhatja le az állapotsort.
 - Zárolt képernyőn teljes képernyős értesítés indít egy külön `BreakActivity`-t, ami a lezárási képernyő
   felett jelenik meg, és bekapcsolja a kijelzőt.
-- Ha az engedélyek hiányoznak, az app értesítésre vált vissza (felugró értesítés visszaszámlálás nélkül).
+- Az overlay mellé minden szünetnél felugró értesítés is érkezik. Egyes appok ugyanis elrejtik a más appok
+  feletti ablakokat, amíg előtérben vannak (például a rendszerbeállítások). Az értesítés ilyenkor is látszik,
+  és rákoppintva teljes képernyős szünet-képernyő nyílik meg.
+- Ha az engedélyek hiányoznak, az app csak értesítésre vált vissza (visszaszámlálás nélkül).
+
+## Hibakeresés
+
+Ha a szünet nem jelenik meg, vagy késik:
+
+1. A főképernyőn a `Teszt: szünet 10 mp múlva` gombbal ki lehet próbálni az ébresztést: nyomd meg, és válts
+   át másik appra.
+2. A főképernyő alján látszik az **utolsó szünet** indulási ideje, a **késése** a tervezetthez képest, és hogy
+   hogyan jelent meg (`overlay + értesítés` vagy `csak értesítés`).
+3. Ellenőrizd, hogy a `Megjelenés minden felett` kártyán minden pipa zöld, és az akkumulátor-optimalizálás
+   ki van kapcsolva.
+4. Egyes gyártók (Xiaomi, Huawei, Samsung, OnePlus) külön engedélyt kérnek az automatikus indításhoz és a
+   háttérben futáshoz. Ezt a telefon beállításaiban kell megadni.
 
 ## Ismert korlátok
 
