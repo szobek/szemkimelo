@@ -61,6 +61,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -146,18 +148,22 @@ private fun MainScreen() {
     var lastMode by remember { mutableStateOf(prefs.lastBreakMode) }
     var showPermissionDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = System.currentTimeMillis()
-            nextBreak = prefs.nextBreakAt
-            running = prefs.running
-            canDraw = Settings.canDrawOverlays(ctx)
-            canFullScreen = Notifications.canUseFullScreenIntent(ctx)
-            batteryOk = isIgnoringBatteryOptimizations(ctx)
-            lastFired = prefs.lastBreakFired
-            lastPlanned = prefs.lastBreakPlanned
-            lastMode = prefs.lastBreakMode
-            delay(500)
+    // Az állapotot csak akkor frissítjük, amikor az app látszik (háttérben ne pörögjön feleslegesen).
+    val lifecycleOwner = ctx as ComponentActivity
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                now = System.currentTimeMillis()
+                nextBreak = prefs.nextBreakAt
+                running = prefs.running
+                canDraw = Settings.canDrawOverlays(ctx)
+                canFullScreen = Notifications.canUseFullScreenIntent(ctx)
+                batteryOk = isIgnoringBatteryOptimizations(ctx)
+                lastFired = prefs.lastBreakFired
+                lastPlanned = prefs.lastBreakPlanned
+                lastMode = prefs.lastBreakMode
+                delay(500)
+            }
         }
     }
 

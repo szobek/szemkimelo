@@ -176,6 +176,9 @@ class App:
         self.cfg = load_config()
         self.main_win: tk.Toplevel | None = None
         self.events: queue.Queue[str] = queue.Queue()
+        self._main_text = ""
+        self._pause_text = ""
+        self._icon_title = ""
 
         self.root = tk.Tk()
         self.root.withdraw()
@@ -269,14 +272,21 @@ class App:
             self.main_win.withdraw()
 
     def update_main(self) -> None:
-        if self.main_win is None:
-            return
+        if self.main_win is None or self.main_win.state() == "withdrawn":
+            return  # rejtett ablakot nem frissítünk
         if self.state == "break":
-            self.main_time.config(text="szünet…")
+            text = "szünet…"
         else:
-            self.main_time.config(text=fmt(self.paused_remaining if self.state == "paused"
-                                           else self.next_break - time.monotonic()))
-        self.pause_btn.config(text="Folytatás" if self.state == "paused" else "Szüneteltetés")
+            text = fmt(self.paused_remaining if self.state == "paused"
+                       else self.next_break - time.monotonic())
+        # Csak változáskor írjuk át a feliratokat (a tick negyedmásodpercenként fut).
+        if text != self._main_text:
+            self._main_text = text
+            self.main_time.config(text=text)
+        pause_text = "Folytatás" if self.state == "paused" else "Szüneteltetés"
+        if pause_text != self._pause_text:
+            self._pause_text = pause_text
+            self.pause_btn.config(text=pause_text)
 
     # ---- beállítások
     @property
@@ -342,7 +352,10 @@ class App:
         if self.state != "break":
             self.check_reminders(now)
 
-        self.icon.title = f"{APP_NAME} – {self.remaining_text()}"
+        title = f"{APP_NAME} – {self.remaining_text()}"
+        if title != self._icon_title:  # a tálcaikon címét csak változáskor frissítjük
+            self._icon_title = title
+            self.icon.title = title
         self.update_main()
         self.root.after(80 if self.state == "break" else 250, self.tick)
 
