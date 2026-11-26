@@ -1,35 +1,79 @@
 # Szemkímélő – Android
 
-A Windowsos Szemkímélő Android változata (natív Kotlin + Jetpack Compose).
+A [Szemkímélő](../README.md) Android változata: a **20-20-20 szabály** emlékeztetője, ebéd- és
+vízivás-emlékeztetővel. Natív Kotlin + Jetpack Compose app.
+
+<table>
+<tr>
+<td align="center"><b>Főképernyő</b><br><img src="../docs/images/android-fooldal.png" width="230" alt="Főképernyő"></td>
+<td align="center"><b>Beállítások</b><br><img src="../docs/images/android-beallitasok.png" width="230" alt="Beállítások"></td>
+<td align="center"><b>Szünet</b><br><img src="../docs/images/android-szunet.png" width="230" alt="Szünet-képernyő"></td>
+</tr>
+<tr>
+<td align="center"><b>Szünet zárolt képernyőn</b><br><img src="../docs/images/android-zarolt.png" width="230" alt="Szünet zárolt képernyőn"></td>
+<td align="center" colspan="2"><b>Ivás és ebéd emlékeztető</b><br><img src="../docs/images/android-ertesitesek.png" width="300" alt="Ivás és ebéd emlékeztető"></td>
+</tr>
+</table>
 
 ## Funkciók
 
-- **20-20-20 szünet:** 20 percenként (állítható) teljes képernyős visszaszámláló jelenik meg
-  más appok felett: nagy számláló, folyamatjelző, pulzáló keret, `Kihagyom` gomb
-- **Hangjelzés** (a telefon értesítési hangja) és opcionális rezgés a szünet elején és az emlékeztetőknél;
-  mindkettő külön kapcsolható az appban
-- **Zárolt képernyőn is megjelenik:** a telefon felébred, és a visszaszámláló a lezárási képernyő felett látszik
-- A `+` / `−` gombok nyomva tartva folyamatosan (egyre gyorsabban) változtatják az értéket
-- **Ivás emlékeztető** óránként (az időköz 15–240 perc között állítható), felugró értesítés
-- **Ebéd emlékeztető** beállítható időponttal, napi egyszer; elhalasztható 10 percre
-- Újraindítás után az emlékeztetők maguktól folytatódnak
+- **20-20-20 szünet:** 20 percenként (állítható) teljes képernyős visszaszámláló jelenik meg más appok
+  felett: nagy számláló, folyamatjelző, pulzáló keret, `Kihagyom` gomb. A szünet végén az időzítő magától
+  újraindul.
+- **Zárolt képernyőn is megjelenik:** a telefon felébred, és a visszaszámláló a lezárási képernyő felett látszik.
+- **Hangjelzés** (a telefon értesítési hangja) és opcionális **rezgés** a szünet elején és az emlékeztetőknél.
+  Mindkettő külön kapcsolható az appban.
+- **Ivás emlékeztető** óránként (az időköz 15–240 perc között állítható), felugró értesítésként.
+- **Ebéd emlékeztető** beállítható időponttal, napi egyszer. Az értesítésről elhalasztható 10 percre.
+- A `+` / `−` gombok nyomva tartva folyamatosan (egyre gyorsabban) változtatják az értéket.
+- A beállítások módosítása után az időzítés magától frissül, nem kell újraindítani az appot.
+- Újraindítás után az emlékeztetők maguktól folytatódnak.
+- A futást egy állandó értesítés jelzi, amin a `Szünet most` és a `Leállítás` művelet is elérhető.
+- Nincs internet-hozzáférés, nincs adatgyűjtés.
+
+## Telepítés (APK)
+
+1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.0)
+   oldalról.
+2. Nyisd meg a telefonon, és engedélyezd az ismeretlen forrásból való telepítést.
+3. Indítsd el az appot, nyomd meg az `Indítás` gombot, és add meg a kért engedélyeket.
+
+Követelmény: Android 8.0 (API 26) vagy újabb. A Play Protect figyelmeztethet, mert az APK nincs a Play
+Áruházban.
 
 ## Engedélyek
 
 | Engedély | Mire kell |
 |---|---|
-| Értesítések | ivás és ebéd emlékeztető, futás jelzése |
+| Értesítések | ivás és ebéd emlékeztető, a futás jelzése |
 | Megjelenítés más appok felett | teljes képernyős visszaszámláló használat közben (nélküle csak értesítést kapsz) |
 | Teljes képernyős értesítések | a visszaszámláló zárolt képernyő felett (Android 14+: kézzel kell engedélyezni, az app jelzi) |
 | Pontos ébresztők | az emlékeztetők pontos időzítése (automatikusan megkapja) |
+| Előtér-szolgáltatás | az időzítő folyamatos futása a háttérben |
+| Indítás újraindítás után | az emlékeztetők folytatása a telefon újraindítása után |
+| Rezgés | opcionális rezgés a szünet elején |
 
-## Telepítés (APK)
+A főképernyő `Megjelenés minden felett` kártyája mutatja, hogy a két megjelenítési engedély megvan-e, és
+egy koppintással a megfelelő rendszerbeállításhoz visz.
 
-1. Töltsd le az `.apk` fájlt a [Releases](../../releases) oldalról.
-2. Nyisd meg a telefonon, és engedélyezd az ismeretlen forrásból való telepítést.
-3. Indítsd el az appot, nyomd meg az `Indítás` gombot, és add meg a kért engedélyeket.
+## Hogyan működik?
 
-A Play Protect figyelmeztethet, mert az APK nincs a Play Áruházban.
+- Az időzítést a rendszer pontos ébresztői (`AlarmManager`) végzik, egy előtér-szolgáltatás (`ReminderService`)
+  kezeli az eseményeket, ezért az app a háttérben is megbízhatóan működik.
+- Használat közben a szünetet egy `TYPE_APPLICATION_OVERLAY` ablak mutatja. Ez az Android szabályai szerint
+  nem takarhatja le az állapotsort.
+- Zárolt képernyőn teljes képernyős értesítés indít egy külön `BreakActivity`-t, ami a lezárási képernyő
+  felett jelenik meg, és bekapcsolja a kijelzőt.
+- Ha az engedélyek hiányoznak, az app értesítésre vált vissza (felugró értesítés visszaszámlálás nélkül).
+
+## Ismert korlátok
+
+- Az app erőltetett leállítása (`Kényszerített leállítás` a rendszerbeállításokban) törli az ébresztőket.
+  Ilyenkor nyisd meg újra az appot, és nyomd meg az `Indítás` gombot.
+- Egyes gyártók (pl. Xiaomi, Huawei, Samsung) agresszíven leállítják a háttérfolyamatokat. Ilyenkor érdemes az
+  appot kivenni az akkumulátor-optimalizálásból.
+- A release APK jelenleg a debug kulccsal van aláírva, ami oldaltöltéshez (sideload) elég. Play Áruházhoz külön
+  feltöltési kulcs kellene.
 
 ## Fejlesztés
 
@@ -43,5 +87,15 @@ cd android
 
 A `local.properties` fájlban kell megadni az SDK helyét (`sdk.dir=...`); ez nincs a repóban.
 
-A release APK jelenleg a debug kulccsal van aláírva, ami oldaltöltéshez (sideload) elég. Play Áruházhoz
-külön feltöltési kulcs kellene.
+### Felépítés
+
+| Fájl | Szerepe |
+|---|---|
+| `MainActivity.kt` | a Compose felület: állapot, beállítások, engedélykezelés |
+| `ReminderService.kt` | előtér-szolgáltatás: a szünet, az ivás és az ebéd eseményei |
+| `Scheduler.kt` | az ébresztők beállítása és törlése |
+| `Notifications.kt` | értesítési csatornák és értesítések |
+| `BreakOverlay.kt` | a szünet-képernyő tartalma és az overlay ablak |
+| `BreakActivity.kt` | a szünet-képernyő zárolt képernyő felett |
+| `Prefs.kt` | a beállítások tárolása |
+| `Receivers.kt` | ébresztő- és indítás utáni fogadók |
