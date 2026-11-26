@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,15 +14,41 @@ android {
         applicationId = "hu.szobek.szemkimelo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
+    }
+
+    // Aláírás: az android/keystore.properties fájlból (helyi build), vagy a SZK_* környezeti
+    // változókból (CI). Ha egyik sincs, a debug kulcsot használjuk, így a projekt kulcs nélkül is lefordul.
+    val keystoreProps = Properties().apply {
+        val f = rootProject.file("keystore.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+    fun signingValue(propKey: String, envKey: String): String? =
+        keystoreProps.getProperty(propKey) ?: System.getenv(envKey)
+
+    val releaseStoreFile = signingValue("storeFile", "SZK_KEYSTORE_FILE")
+    val hasReleaseKey = releaseStoreFile != null && file(releaseStoreFile).exists()
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = signingValue("storePassword", "SZK_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "SZK_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "SZK_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Oldaltöltéshez (sideload) a debug kulccsal írjuk alá, így közvetlenül telepíthető.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKey) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

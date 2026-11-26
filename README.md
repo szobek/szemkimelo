@@ -165,6 +165,25 @@ hiányzik, és a megfelelő beállításhoz visz.
 Ha hibát találsz, vagy van ötleted, nyiss egy [issue-t](https://github.com/szobek/szemkimelo/issues), vagy
 küldj pull requestet.
 
+## Kiadások készítése
+
+A kiadásokat a GitHub Actions építi, a címke (tag) neve dönti el, mi készül:
+
+| Címke | Eredmény |
+|---|---|
+| `v1.2.3` | Windowsos `Szemkimelo.exe` a release-hez csatolva |
+| `android-v1.2.3` | aláírt Androidos APK a release-hez csatolva |
+
+```powershell
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+Az Androidos aláíráshoz négy titok kell a repó beállításaiban (`Settings → Secrets and variables → Actions`):
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+Helyi buildhez az `android/keystore.properties` fájl kell (`storeFile`, `storePassword`, `keyAlias`,
+`keyPassword`); ez és a kulcsfájl nincs a repóban. Kulcs nélkül a build a debug kulccsal ír alá.
+
 ## Mappaszerkezet
 
 ```
@@ -172,4 +191,9 @@ szemkimelo.py      A Windowsos app (Python + tkinter)
 requirements.txt   Windowsos függőségek
 android/           Az Androidos app (Kotlin + Compose)
 docs/images/       A README képei
+.github/workflows/ Automatikus kiadás-készítés
 ```
+
+## Licenc
+
+[MIT](LICENSE): szabadon használhatod, módosíthatod és terjesztheted.
