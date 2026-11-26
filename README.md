@@ -15,8 +15,8 @@ Mellé ebéd- és vízivás-emlékeztetőt is ad.
 
 | Platform | Letöltés | Mit kell tudni |
 |---|---|---|
-| 🪟 **Windows** | [Szemkimelo.exe – v1.1.2](https://github.com/szobek/szemkimelo/releases/tag/v1.1.2) | Önállóan fut, Python nem kell hozzá |
-| 🤖 **Android** | [Szemkimelo-android.apk – v1.0.2](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.2) | Android 8.0 vagy újabb, oldaltöltéssel telepíthető |
+| 🪟 **Windows** | [Szemkimelo.exe – v1.2.0](https://github.com/szobek/szemkimelo/releases/tag/v1.2.0) | Önállóan fut, Python nem kell hozzá |
+| 🤖 **Android** | [Szemkimelo-android.apk – v1.1.0](https://github.com/szobek/szemkimelo/releases/tag/android-v1.1.0) | Android 8.0 vagy újabb, oldaltöltéssel telepíthető |
 
 Az app **nem használ internetet**, nem gyűjt és nem küld adatot. A Windowsos változat beállításai egyetlen
 helyi fájlban vannak, az Androidos az app saját tárolójában.
@@ -38,8 +38,33 @@ helyi fájlban vannak, az Androidos az app saját tárolójában.
   újraindul. Az ivás emlékeztető is csak akkor jön, ha éppen a gépnél vagy.
 - **Tálcaikon** a hátralévő idővel és menüvel: megnyitás, szünet most, szüneteltetés, időzítő újraindítása,
   beállítások, kilépés.
+- **Munkaidő stopper** (`⏱ Munkaidő` gomb vagy tálcamenü): lásd lent.
 - Indítás a Windows-szal (kikapcsolható), ilyenkor csak a tálcán jelenik meg.
 - Egyszerre egy példány fut: az exe újraindítása előhozza a már futó ablakot.
+
+### Munkaidő stopper
+
+Azt méri, mennyit dolgoztál. A szünet-emlékeztetőtől független: a szünetek alatt is fut, és csak te állítod le.
+
+- **Indítás / Szüneteltetés / Folytatás:** a mérés bármikor szüneteltethető.
+- **Részidő mentése:** elmenti az addig mért szakaszt egy megjegyzéssel, a mérés pedig megy tovább a következő
+  szakaszra.
+- **Leállítás:** a hátralévő időt menti megjegyzéssel, és a stopper nullázódik.
+- **Napi összesítő:** naponként listázza a bejegyzéseket (kezdés, időtartam, megjegyzés) és az összeget. A
+  napok között lapozhatsz, a megjegyzés szerkeszthető (dupla kattintás), a bejegyzés törölhető.
+- **Hónap exportálása (CSV):** a kijelzett nap hónapját menti fájlba. Excelben közvetlenül megnyitható
+  (pontosvesszős, ékezethelyes). Tartalma: a hónap bejegyzései (dátum, kezdés, időtartam, tizedes óra,
+  megjegyzés), napi összesítők és a havi összeg.
+- **CSV importálása:** a korábban exportált fájlt visszatölti (például új gépen vagy telefoncsere után).
+  Összefésül: amit az app már tartalmaz (azonos kezdés percre, időtartam és megjegyzés), azt kihagyja, így
+  többször is importálhatsz duplikátumok nélkül. A kezdés másodperce az exportban nincs benne, az időtartam
+  viszont másodpercre pontos.
+
+A bejegyzések a `%APPDATA%\Szemkimelo\worklog.json` fájlban vannak. Az app bezárásakor (`Kilépés`) a stopper
+szünetel, hogy ne mérjen olyan időt, amikor nem futott a program. Összeomlás után is megmarad a mérés, az utolsó
+mentett pillanatig.
+
+<p align="center"><img src="docs/images/windows-munkaido.png" alt="Munkaidő ablak"></p>
 
 ### Képek
 
@@ -109,16 +134,21 @@ Natív Kotlin + Jetpack Compose app, ugyanazokkal az alapfunkciókkal. Részlete
 <td align="center"><b>Főképernyő</b><br><img src="docs/images/android-fooldal.png" width="230" alt="Főképernyő"></td>
 <td align="center"><b>Szünet</b><br><img src="docs/images/android-szunet.png" width="230" alt="Szünet-képernyő"></td>
 <td align="center"><b>Zárolt képernyőn</b><br><img src="docs/images/android-zarolt.png" width="230" alt="Szünet zárolt képernyőn"></td>
+<td align="center"><b>Munkaidő</b><br><img src="docs/images/android-munkaido.png" width="230" alt="Munkaidő stopper"></td>
 </tr>
 </table>
 
 - 20 percenként teljes képernyős visszaszámláló jelenik meg más appok felett, **zárolt képernyőn is**.
 - Hangjelzés és rezgés (külön kapcsolható), ivás és ebéd emlékeztető értesítésként.
+- **Munkaidő stopper** a `⏱ Munkaidő` fülön: indítás/szünet, részidő megjegyzéssel, leállítás és napi összesítő.
+  A mérés akkor is fut, ha az app a háttérben van vagy a rendszer leállította. A hónap **CSV-ben
+  exportálható** és megosztható (Drive, e-mail stb.), az exportált fájl pedig **visszaimportálható**
+  (telefoncsere után is megvan az adat).
 - Újraindítás után az emlékeztetők maguktól folytatódnak.
 
 ### Telepítés
 
-1. Töltsd le az APK-t a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.2) oldalról. Ha az 1.0.1-es vagy régebbi
+1. Töltsd le az APK-t a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.1.0) oldalról. Ha az 1.0.1-es vagy régebbi
    verzió van fent, előbb töröld le (a v1.0.2-től az APK saját, állandó kulccsal van aláírva, ezért ez egyszer
    szükséges; a későbbi frissítések már a telepített fölé kerülnek).
 2. Nyisd meg, és engedélyezd az ismeretlen forrásból való telepítést.
@@ -190,6 +220,9 @@ Helyi buildhez az `android/keystore.properties` fájl kell (`storeFile`, `storeP
 
 ```
 szemkimelo.py      A Windowsos app (Python + tkinter)
+worklog.py         A munkaidő stopper logikája (Windows)
+worklog_ui.py      A munkaidő ablak (Windows)
+tests/             Egységtesztek (python -m unittest discover -s tests)
 requirements.txt   Windowsos függőségek
 android/           Az Androidos app (Kotlin + Compose)
 docs/images/       A README képei

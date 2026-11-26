@@ -14,8 +14,8 @@ android {
         applicationId = "hu.szobek.szemkimelo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.1.0"
     }
 
     // Aláírás: az android/keystore.properties fájlból (helyi build), vagy a SZK_* környezeti

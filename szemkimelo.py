@@ -19,6 +19,9 @@ from tkinter import ttk
 import pystray
 from PIL import Image, ImageDraw
 
+from worklog import WorkLog
+from worklog_ui import WorkLogWindow
+
 try:
     import winreg
 except ImportError:  # nem Windows – csak a fejlesztéshez
@@ -29,6 +32,7 @@ RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_VALUE = "Szemkimelo"
 CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Szemkimelo")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
+WORKLOG_PATH = os.path.join(CONFIG_DIR, "worklog.json")
 
 DEFAULTS = {
     "work_minutes": 20,
@@ -194,6 +198,8 @@ class App:
         self.break_win: tk.Toplevel | None = None
         self.overlay_win: tk.Toplevel | None = None
         self.settings_win: tk.Toplevel | None = None
+        self.worklog = WorkLog(WORKLOG_PATH)
+        self.worklog_win: WorkLogWindow | None = None
 
         self.icon = pystray.Icon(
             "szemkimelo", make_icon(), APP_NAME, menu=self.build_menu()
@@ -229,7 +235,7 @@ class App:
         win.title(APP_NAME)
         win.resizable(False, False)
         win.configure(bg=BG)
-        w, h = 400, 330
+        w, h = 400, 378
         sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
         win.geometry(f"{w}x{h}+{(sw - w) // 2}+{(sh - h) // 2}")
         win.attributes("-topmost", True)
@@ -261,6 +267,9 @@ class App:
         btn("Beállítások", lambda: self.events.put("settings"), row2)
         btn("Elrejtés a tálcára", self.hide_main, row2)
         btn("Kilépés", lambda: self.events.put("quit"), row2)
+        row3 = tk.Frame(win, bg=BG)
+        row3.pack(pady=4)
+        self.worklog_btn = btn("⏱ Munkaidő", lambda: self.events.put("worklog"), row3)
 
         tk.Label(win, text="Bezárás (X) = a tálcán fut tovább.", font=("Segoe UI", 9),
                  bg=BG, fg=MUTED).pack(pady=(10, 0))
@@ -318,6 +327,7 @@ class App:
             ),
             pystray.MenuItem("Időzítő újraindítása", lambda: self.events.put("reset")),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Munkaidő…", lambda: self.events.put("worklog")),
             pystray.MenuItem("Beállítások…", lambda: self.events.put("settings")),
             pystray.MenuItem("Kilépés", lambda: self.events.put("quit")),
         )
@@ -357,6 +367,9 @@ class App:
             self._icon_title = title
             self.icon.title = title
         self.update_main()
+        self.worklog.beat()
+        if self.worklog_win is not None:
+            self.worklog_win.update()
         self.root.after(80 if self.state == "break" else 250, self.tick)
 
     def check_reminders(self, now: float) -> None:
@@ -468,6 +481,8 @@ class App:
                 self.next_break = time.monotonic() + self.work_secs
         elif event == "settings":
             self.open_settings()
+        elif event == "worklog":
+            self.open_worklog()
         elif event == "quit":
             self.quit()
 
@@ -666,7 +681,20 @@ class App:
         win.protocol("WM_DELETE_WINDOW", close)
 
     # ---- kilépés
+    # ---- munkaidő-stopper
+    def open_worklog(self) -> None:
+        if self.worklog_win is not None:
+            self.worklog_win.show()
+            return
+        colors = {"bg": BG, "fg": FG, "accent": ACCENT, "muted": MUTED}
+        self.worklog_win = WorkLogWindow(self.root, self.worklog, colors, self._worklog_closed)
+        self.worklog_win.show()
+
+    def _worklog_closed(self) -> None:
+        self.worklog_win = None
+
     def quit(self) -> None:
+        self.worklog.pause()  # kilépéskor a futó mérés szünetel (a következő indításkor folytatható)
         self.icon.stop()
         self.root.quit()
 

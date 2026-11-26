@@ -29,11 +29,26 @@ vízivás-emlékeztetővel. Natív Kotlin + Jetpack Compose app.
 - A beállítások módosítása után az időzítés magától frissül, nem kell újraindítani az appot.
 - Újraindítás után az emlékeztetők maguktól folytatódnak.
 - A futást egy állandó értesítés jelzi, amin a `Szünet most` és a `Leállítás` művelet is elérhető.
+- **Munkaidő stopper** (`⏱ Munkaidő` fül): azt méri, mennyit dolgoztál, a szünet-emlékeztetőtől függetlenül.
+  - `Indítás` / `Szünet` / `Folytatás`.
+  - `Részidő`: elmenti az addig mért szakaszt megjegyzéssel, a mérés pedig megy tovább.
+  - `Leállítás`: a hátralévő időt menti megjegyzéssel, és a stopper nullázódik.
+  - `Napi összesítő`: naponként a bejegyzések (kezdés, időtartam, megjegyzés) és az összeg; napok között
+    lapozhatsz, a megjegyzés szerkeszthető, a bejegyzés törölhető.
+  - `<hónap> exportálása (CSV)`: a kijelzett nap hónapját CSV-fájlba írja, és megnyílik a rendszer megosztó
+    ablaka (Drive, e-mail, Telegram stb.). Excelben közvetlenül megnyitható. A bejegyzések az app belső
+    tárolójában vannak, ezért érdemes időnként exportálni: így telefoncsere vagy az app törlése után is megvan
+    az adat.
+  - `Importálás exportált CSV-ből`: fájlválasztóval (telefon, Drive) visszatölti a korábban exportált
+    fájlt. Összefésül, a már meglévő bejegyzéseket kihagyja, ezért többször is importálhatsz duplikátumok
+    nélkül. Új telefonon így állíthatod vissza a régi adatokat.
+  - A mérés időbélyegekre épül, ezért akkor is helyes marad, ha az app a háttérben van vagy a rendszer
+    leállította. Az adatok az app belső tárolójában vannak (`worklog.json`), nem hagyják el a telefont.
 - Nincs internet-hozzáférés, nincs adatgyűjtés.
 
 ## Telepítés (APK)
 
-1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.2)
+1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.1.0)
    oldalról. Ha az 1.0.1-es vagy régebbi verzió van fent, előbb töröld le (a v1.0.2-től az APK saját,
    állandó kulccsal van aláírva, ezért ez egyszer szükséges; a későbbi frissítések már a telepített fölé kerülnek).
 2. Nyisd meg a telefonon, és engedélyezd az ismeretlen forrásból való telepítést.
@@ -122,7 +137,9 @@ A `local.properties` fájlban kell megadni az SDK helyét (`sdk.dir=...`); ez ni
 
 | Fájl | Szerepe |
 |---|---|
-| `MainActivity.kt` | a Compose felület: állapot, beállítások, engedélykezelés |
+| `MainActivity.kt` | a Compose felület: fülek, állapot, beállítások, engedélykezelés |
+| `WorkLog.kt` | a munkaidő stopper logikája és tárolása |
+| `WorkLogScreen.kt` | a `Munkaidő` fül felülete |
 | `ReminderService.kt` | előtér-szolgáltatás: a szünet, az ivás és az ebéd eseményei |
 | `Scheduler.kt` | az ébresztők beállítása és törlése |
 | `Notifications.kt` | értesítési csatornák és értesítések |

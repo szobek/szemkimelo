@@ -50,6 +50,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,10 +68,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val Bg = Color(0xFF14213D)
-private val CardBg = Color(0xFF1C2D52)
-private val Accent = Color(0xFF4CC9F0)
-private val Muted = Color(0xFFA9B4C9)
+internal val Bg = Color(0xFF14213D)
+internal val CardBg = Color(0xFF1C2D52)
+internal val Accent = Color(0xFF4CC9F0)
+internal val Muted = Color(0xFFA9B4C9)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,8 +83,31 @@ class MainActivity : ComponentActivity() {
                     onSurface = Color.White, onBackground = Color.White
                 )
             ) {
-                Surface(Modifier.fillMaxSize(), color = Bg) { MainScreen() }
+                Surface(Modifier.fillMaxSize(), color = Bg) { AppRoot() }
             }
+        }
+    }
+}
+
+/** Két fül: a 20-20-20 emlékeztető és a munkaidő-stopper. */
+@Composable
+private fun AppRoot() {
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    Column(Modifier.fillMaxSize().systemBarsPadding()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            listOf("👀 Szemkímélő", "⏱ Munkaidő").forEachIndexed { index, label ->
+                if (tab == index) {
+                    Button(onClick = { tab = index }, modifier = Modifier.weight(1f)) { Text(label) }
+                } else {
+                    OutlinedButton(onClick = { tab = index }, modifier = Modifier.weight(1f)) { Text(label) }
+                }
+            }
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (tab == 0) MainScreen() else WorkLogScreen()
         }
     }
 }
@@ -232,7 +256,6 @@ private fun MainScreen() {
     Column(
         Modifier
             .fillMaxSize()
-            .systemBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -353,7 +376,7 @@ private fun MainScreen() {
 }
 
 @Composable
-private fun SectionCard(title: String? = null, content: @Composable () -> Unit) {
+internal fun SectionCard(title: String? = null, content: @Composable () -> Unit) {
     Card(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = CardBg)
