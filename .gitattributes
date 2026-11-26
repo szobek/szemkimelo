@@ -1,0 +1,4 @@
+# A Gradle wrapper szkript Linuxon/Macen csak LF sorvégződéssel fut.
+android/gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
