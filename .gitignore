@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+_err.txt
+_smoke.py
+_dbg.py
+.venv/
