@@ -16,7 +16,7 @@ Mellé ebéd- és vízivás-emlékeztetőt is ad.
 | Platform | Letöltés | Mit kell tudni |
 |---|---|---|
 | 🪟 **Windows** | [Szemkimelo.exe – v1.1.1](https://github.com/szobek/szemkimelo/releases/tag/v1.1.1) | Önállóan fut, Python nem kell hozzá |
-| 🤖 **Android** | [Szemkimelo-android.apk – v1.0.0](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.0) | Android 8.0 vagy újabb, oldaltöltéssel telepíthető |
+| 🤖 **Android** | [Szemkimelo-android.apk – v1.0.1](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.1) | Android 8.0 vagy újabb, oldaltöltéssel telepíthető |
 
 Az app **nem használ internetet**, nem gyűjt és nem küld adatot. A Windowsos változat beállításai egyetlen
 helyi fájlban vannak, az Androidos az app saját tárolójában.
@@ -118,7 +118,7 @@ Natív Kotlin + Jetpack Compose app, ugyanazokkal az alapfunkciókkal. Részlete
 
 ### Telepítés
 
-1. Töltsd le az APK-t a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.0) oldalról.
+1. Töltsd le az APK-t a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.1) oldalról.
 2. Nyisd meg, és engedélyezd az ismeretlen forrásból való telepítést.
 3. Indítsd el, nyomd meg az `Indítás` gombot, és add meg a kért engedélyeket.
 

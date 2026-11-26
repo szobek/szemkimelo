@@ -33,7 +33,7 @@ vízivás-emlékeztetővel. Natív Kotlin + Jetpack Compose app.
 
 ## Telepítés (APK)
 
-1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.0)
+1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.0.1)
    oldalról.
 2. Nyisd meg a telefonon, és engedélyezd az ismeretlen forrásból való telepítést.
 3. Indítsd el az appot, nyomd meg az `Indítás` gombot, és add meg a kért engedélyeket.
