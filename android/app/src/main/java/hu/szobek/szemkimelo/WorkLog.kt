@@ -130,8 +130,11 @@ class WorkLog(context: Context) {
     fun monthEntries(month: YearMonth): List<WorkEntry> =
         entries.filter { YearMonth.from(it.day) == month }.sortedBy { it.startMs }
 
-    /** A hónap bejegyzései és napi összesítői CSV-ben (pontosvesszős, magyar Excelhez, UTF-8 BOM-mal). */
-    fun monthCsv(month: YearMonth): String {
+    /**
+     * A hónap bejegyzései és napi összesítői CSV-ben (pontosvesszős, magyar Excelhez, UTF-8 BOM-mal).
+     * Ha a teendők is megvannak, a hónapban elvégzettek és az összes nyitott teendő is bekerül.
+     */
+    fun monthCsv(month: YearMonth, tasks: TaskStore? = null): String {
         val sb = StringBuilder("\uFEFF")
         fun row(vararg cells: String) {
             sb.append(cells.joinToString(";") { csvCell(it) }).append("\r\n")
@@ -152,17 +155,33 @@ class WorkLog(context: Context) {
         perDay.forEach { (d, s) -> row(csvDate(d), "", fmtHms(s * 1000L), csvHours(s)) }
         val total = perDay.values.sum()
         row("Összesen (%04d.%02d.)".format(month.year, month.monthValue), "", fmtHms(total * 1000L), csvHours(total))
+        if (tasks != null) {
+            val sections = listOf(
+                "Elvégzett teendők" to tasks.doneInMonth(month).map { it.doneMs!! to it.text },
+                "Nyitott teendők" to tasks.openTasks().map { it.createdMs to it.text }
+            )
+            for ((title, items) in sections) {
+                sb.append("\r\n")
+                row(title)
+                row("Dátum", "Idő", "Teendő") // elvégzés, nyitottnál létrehozás ideje
+                for ((ms, text) in items) {
+                    val t = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
+                    row(csvDate(t.toLocalDate()), "%02d:%02d".format(t.hour, t.minute), csvSafe(text))
+                }
+            }
+        }
         return sb.toString()
     }
 
-    /** Az importálás eredménye: új, már meglévő (kihagyott) és hibás sorok száma. */
-    data class ImportResult(val added: Int, val skipped: Int, val bad: Int)
+    /** Az importálás eredménye: új, már meglévő (kihagyott) és hibás sorok, valamint új teendők száma. */
+    data class ImportResult(val added: Int, val skipped: Int, val bad: Int, val tasksAdded: Int = 0)
 
     /**
      * Exportált CSV visszaolvasása. Összefésül: ami már megvan (kezdés percre, időtartam, megjegyzés),
-     * azt kihagyja. Ha a szöveg nem munkaidő-export, IllegalArgumentException.
+     * azt kihagyja. Ha a teendők (TaskStore) meg vannak adva, az "Elvégzett teendők" és "Nyitott teendők"
+     * szakaszt is visszatölti. Ha a szöveg nem munkaidő-export, IllegalArgumentException.
      */
-    fun importCsv(text: String): ImportResult {
+    fun importCsv(text: String, tasks: TaskStore? = null): ImportResult {
         val rows = parseCsv(text.removePrefix("\uFEFF"))
         require(rows.isNotEmpty() && rows[0].take(3).map { it.trim() } == listOf("Dátum", "Kezdés", "Időtartam")) {
             "Ez nem munkaidő-export fájl."
@@ -172,8 +191,37 @@ class WorkLog(context: Context) {
         val fresh = mutableListOf<WorkEntry>()
         var skipped = 0
         var bad = 0
+        var tasksAdded = 0
+        var section = "entries"
+        var headerNext = false
         for (row in rows.drop(1)) {
-            if (row.all { it.isBlank() }) break // itt véget ér a bejegyzések táblázata
+            if (row.all { it.isBlank() }) { section = ""; continue } // üres sor: új szakasz (vagy a vége)
+            val title = if (row.count { it.isNotBlank() } == 1) row[0].trim() else ""
+            when (title) {
+                "Napi összesítő" -> { section = "daily"; headerNext = false; continue }
+                "Elvégzett teendők" -> { section = "done"; headerNext = true; continue }
+                "Nyitott teendők" -> { section = "open"; headerNext = true; continue }
+            }
+            if (section == "done" || section == "open") {
+                if (headerNext) { headerNext = false; continue }
+                if (tasks == null) continue
+                val task = runCatching {
+                    val d = row[0].trim().split(".")
+                    val hm = row[1].trim().split(":")
+                    val whenMs = java.time.LocalDateTime.of(d[0].toInt(), d[1].toInt(), d[2].toInt(), hm[0].toInt(), hm[1].toInt())
+                        .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    var t = row[2].trim()
+                    if (t.length >= 2 && t[0] == '\'' && t[1] in "=+-@") t = t.substring(1)
+                    whenMs to t
+                }.getOrNull()
+                if (task == null || task.second.isEmpty()) {
+                    bad++
+                } else if (tasks.addImported(task.second, task.first, if (section == "done") task.first else null)) {
+                    tasksAdded++
+                }
+                continue
+            }
+            if (section != "entries") continue
             val parsed = runCatching {
                 val d = row[0].trim().split(".")
                 val hm = row[1].trim().split(":")
@@ -198,7 +246,7 @@ class WorkLog(context: Context) {
             entries = entries + fresh
             changed()
         }
-        return ImportResult(fresh.size, skipped, bad)
+        return ImportResult(fresh.size, skipped, bad, tasksAdded)
     }
 
     /** Egyszerű CSV-olvasó pontosvesszővel; kezeli az idézőjeles, akár többsoros mezőket is. */

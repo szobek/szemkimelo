@@ -56,8 +56,9 @@ def ask_note(parent: tk.Misc, colors: dict, title: str, prompt: str, initial: st
 
 
 class WorkLogWindow:
-    def __init__(self, root: tk.Tk, log: WorkLog, colors: dict, on_close) -> None:
+    def __init__(self, root: tk.Tk, log: WorkLog, colors: dict, on_close, tasks=None) -> None:
         self.log = log
+        self.tasks = tasks  # TaskList vagy None: az adott napon elvégzett teendők és az export/import
         self.colors = colors
         self.on_close = on_close
         self.day = date.today()
@@ -130,6 +131,11 @@ class WorkLogWindow:
 
         frame = tk.Frame(win, bg=bg)
         frame.pack(fill="both", expand=True, padx=20, pady=(0, 6))
+        # Az adott nap elvégzett teendői (csak akkor látszik, ha van ilyen).
+        self.done_label = tk.Label(win, text="", font=("Segoe UI", 10), bg=bg, fg=muted, justify="left",
+                                   anchor="w", wraplength=500)
+        self._done_frame = frame
+        self._done_shown = False
         self.tree = ttk.Treeview(frame, style="Work.Treeview", columns=("start", "dur", "note"),
                                  show="headings", selectmode="browse", height=6)
         self.tree.heading("start", text="Kezdés")
@@ -216,7 +222,8 @@ class WorkLogWindow:
         """A kijelzett nap hónapját menti CSV-be (Excelben megnyitható)."""
         y, m = self.day.year, self.day.month
         label = f"{y}. {MONTHS[m - 1]}"
-        if not self.log.month_entries(y, m):
+        has_tasks = self.tasks is not None and (self.tasks.done_in_month(y, m) or self.tasks.open_tasks())
+        if not self.log.month_entries(y, m) and not has_tasks:
             messagebox.showinfo("Exportálás", f"{label} hónapban nincs mentett bejegyzés.", parent=self.win)
             return
         path = filedialog.asksaveasfilename(
@@ -225,7 +232,7 @@ class WorkLogWindow:
         if not path:
             return
         try:
-            self.log.export_month(y, m, path)
+            self.log.export_month(y, m, path, self.tasks)
         except OSError as exc:
             messagebox.showerror("Exportálás", f"Nem sikerült menteni:\n{exc}", parent=self.win)
             return
@@ -238,13 +245,15 @@ class WorkLogWindow:
         if not path:
             return
         try:
-            added, skipped, bad = self.log.import_csv(path)
+            res = self.log.import_csv(path, self.tasks)
         except (OSError, ValueError, UnicodeError) as exc:
             messagebox.showerror("Importálás", f"Nem sikerült az importálás:\n{exc}", parent=self.win)
             return
-        msg = f"Új bejegyzés: {added}\nMár megvolt (kihagyva): {skipped}"
-        if bad:
-            msg += f"\nHibás sor (kihagyva): {bad}"
+        msg = f"Új bejegyzés: {res.added}\nMár megvolt (kihagyva): {res.skipped}"
+        if self.tasks is not None:
+            msg += f"\nÚj teendő: {res.tasks_added}"
+        if res.bad:
+            msg += f"\nHibás sor (kihagyva): {res.bad}"
         messagebox.showinfo("Importálás", msg, parent=self.win)
         self.update()
 
@@ -287,6 +296,21 @@ class WorkLogWindow:
         if running_part:
             text += f"  (futó: {fmt_dur(running_part)})"
         self._set("total", self.total_label, text=text)
+
+        done = self.tasks.done_on(self.day) if self.tasks is not None else []
+        if done:
+            shown = [f"✓ {t['text']}" for t in done[:5]]
+            if len(done) > 5:
+                shown.append(f"… és még {len(done) - 5} elvégzett teendő")
+            text = f"Elvégzett teendők ({len(done)}):\n" + "\n".join(shown)
+            if not self._done_shown:
+                self.done_label.pack(fill="x", padx=22, pady=(0, 4), before=self._done_frame)
+                self._done_shown = True
+            self._set("done", self.done_label, text=text)
+        elif self._done_shown:
+            self.done_label.pack_forget()
+            self._done_shown = False
+            self._cache.pop("done", None)
 
         key = (log.version, self.day)
         if key != self._seen_version:

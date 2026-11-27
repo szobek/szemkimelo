@@ -71,6 +71,7 @@ private fun fmtDay(day: LocalDate, today: LocalDate): String {
 fun WorkLogScreen() {
     val ctx = LocalContext.current
     val log = remember { WorkLog(ctx) }
+    val tasks = remember { TaskStore(ctx) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var day by remember { mutableStateOf(LocalDate.now()) }
     var dialog by remember { mutableStateOf<NoteDialog?>(null) }
@@ -82,8 +83,8 @@ fun WorkLogScreen() {
             val msg = runCatching {
                 val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
                 require(bytes.size <= 5_000_000) { "A fájl túl nagy ahhoz, hogy munkaidő-export legyen." }
-                val r = log.importCsv(String(bytes, Charsets.UTF_8))
-                "Új bejegyzés: ${r.added}, már megvolt: ${r.skipped}" +
+                val r = log.importCsv(String(bytes, Charsets.UTF_8), tasks)
+                "Új bejegyzés: ${r.added}, új teendő: ${r.tasksAdded}, már megvolt: ${r.skipped}" +
                     if (r.bad > 0) ", hibás sor: ${r.bad}" else ""
             }.getOrElse { "Nem sikerült az importálás: ${it.message ?: "ismeretlen hiba"}" }
             Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
@@ -102,13 +103,14 @@ fun WorkLogScreen() {
     }
 
     @Suppress("UNUSED_VARIABLE")
-    val version = log.version // feliratkozás a változásokra
+    val version = log.version + tasks.version // feliratkozás a változásokra
     val state = log.state
     val elapsed = log.elapsedMs(now)
     val elapsedSec = (elapsed / 1000).toInt()
     val today = LocalDate.now()
 
     val entries = log.dayEntries(day)
+    val doneTasks = tasks.doneOn(day)
     val runningPart = if (day == today && state != WorkState.IDLE) elapsedSec else 0
     val total = log.dayTotalSeconds(day) + runningPart
 
@@ -206,6 +208,10 @@ fun WorkLogScreen() {
                 color = Accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold
             )
 
+            if (doneTasks.isNotEmpty()) {
+                Text("Elvégzett teendők (${doneTasks.size})", color = Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                doneTasks.forEach { Text("✓ ${it.text}", fontSize = 14.sp) }
+            }
             if (entries.isEmpty()) {
                 Text("Nincs bejegyzés erre a napra.", color = Muted, fontSize = 14.sp)
             }
@@ -227,10 +233,11 @@ fun WorkLogScreen() {
         val monthLabel = "%d. %s".format(month.year, month.month.getDisplayName(TextStyle.FULL, Locale("hu")))
         OutlinedButton(
             onClick = {
-                if (log.monthEntries(month).isEmpty()) {
+                val hasTasks = tasks.doneInMonth(month).isNotEmpty() || tasks.openTasks().isNotEmpty()
+                if (log.monthEntries(month).isEmpty() && !hasTasks) {
                     Toast.makeText(ctx, "$monthLabel hónapban nincs mentett bejegyzés.", Toast.LENGTH_SHORT).show()
                 } else {
-                    shareMonth(ctx, log, month, monthLabel)
+                    shareMonth(ctx, log, tasks, month, monthLabel)
                 }
             },
             modifier = Modifier.fillMaxWidth()
@@ -244,11 +251,11 @@ fun WorkLogScreen() {
 }
 
 /** A hónap CSV-jét ideiglenes fájlba írja, és megnyitja a rendszer megosztó ablakát. */
-private fun shareMonth(ctx: Context, log: WorkLog, month: YearMonth, label: String) {
+private fun shareMonth(ctx: Context, log: WorkLog, tasks: TaskStore, month: YearMonth, label: String) {
     runCatching {
         val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }
         val file = File(dir, "munkaido-%04d-%02d.csv".format(month.year, month.monthValue))
-        file.writeText(log.monthCsv(month))
+        file.writeText(log.monthCsv(month, tasks))
         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "text/csv"
@@ -264,7 +271,7 @@ private fun shareMonth(ctx: Context, log: WorkLog, month: YearMonth, label: Stri
 }
 
 @Composable
-private fun NoteInputDialog(
+internal fun NoteInputDialog(
     title: String,
     label: String,
     initial: String,

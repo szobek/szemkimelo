@@ -104,12 +104,12 @@ class WorkLogTests(unittest.TestCase):
         text = self.log.month_csv(2026, 11)
 
         # 1) ugyanabba a naplóba visszaolvasva semmi sem duplázódik
-        self.assertEqual(self.log.import_csv_text(text), (0, 3, 0))
+        self.assertEqual(tuple(self.log.import_csv_text(text)), (0, 3, 0, 0))
         self.assertEqual(len(self.log.entries), 3)
 
         # 2) üres naplóba (új telefon) minden visszajön, a megjegyzések is épek
         other = WorkLog(os.path.join(self.dir.name, "other.json"))
-        self.assertEqual(other.import_csv_text(text), (3, 0, 0))
+        self.assertEqual(tuple(other.import_csv_text(text)), (3, 0, 0, 0))
         notes = sorted(e["note"] for e in other.entries)
         self.assertEqual(notes, sorted(["", "=1+1", "Tervezés; \"idézet\""]))
         self.assertEqual(other.day_total(datetime(2026, 11, 26).date()), 5598 + 1800)
@@ -128,7 +128,7 @@ class WorkLogTests(unittest.TestCase):
                 "hibás;09:00;1:00:00;1,00;rossz dátum\r\n"
                 "2026.11.26.;10:00;0:00:00;0,00;nulla\r\n"
                 "\r\nNapi összesítő\r\n")
-        self.assertEqual(self.log.import_csv_text(text), (1, 0, 2))
+        self.assertEqual(tuple(self.log.import_csv_text(text)), (1, 0, 2, 0))
 
     def test_export_month_file_has_bom(self):
         self.log.start(T0)

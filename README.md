@@ -15,8 +15,8 @@ Mellé ebéd- és vízivás-emlékeztetőt is ad.
 
 | Platform | Letöltés | Mit kell tudni |
 |---|---|---|
-| 🪟 **Windows** | [Szemkimelo.exe – v1.2.0](https://github.com/szobek/szemkimelo/releases/tag/v1.2.0) | Önállóan fut, Python nem kell hozzá |
-| 🤖 **Android** | [Szemkimelo-android.apk – v1.1.0](https://github.com/szobek/szemkimelo/releases/tag/android-v1.1.0) | Android 8.0 vagy újabb, oldaltöltéssel telepíthető |
+| 🪟 **Windows** | [Szemkimelo.exe – v1.3.0](https://github.com/szobek/szemkimelo/releases/tag/v1.3.0) | Önállóan fut, Python nem kell hozzá |
+| 🤖 **Android** | [Szemkimelo-android.apk – v1.2.0](https://github.com/szobek/szemkimelo/releases/tag/android-v1.2.0) | Android 8.0 vagy újabb, oldaltöltéssel telepíthető |
 
 Az app **nem használ internetet**, nem gyűjt és nem küld adatot. A Windowsos változat beállításai egyetlen
 helyi fájlban vannak, az Androidos az app saját tárolójában.
@@ -39,6 +39,7 @@ helyi fájlban vannak, az Androidos az app saját tárolójában.
 - **Tálcaikon** a hátralévő idővel és menüvel: megnyitás, szünet most, szüneteltetés, időzítő újraindítása,
   beállítások, kilépés.
 - **Munkaidő stopper** (`⏱ Munkaidő` gomb vagy tálcamenü): lásd lent.
+- **Napi teendők** (`✅ Teendők` gomb vagy tálcamenü): lásd lent.
 - Indítás a Windows-szal (kikapcsolható), ilyenkor csak a tálcán jelenik meg.
 - Egyszerre egy példány fut: az exe újraindítása előhozza a már futó ablakot.
 
@@ -54,8 +55,9 @@ Azt méri, mennyit dolgoztál. A szünet-emlékeztetőtől független: a szünet
   napok között lapozhatsz, a megjegyzés szerkeszthető (dupla kattintás), a bejegyzés törölhető.
 - **Hónap exportálása (CSV):** a kijelzett nap hónapját menti fájlba. Excelben közvetlenül megnyitható
   (pontosvesszős, ékezethelyes). Tartalma: a hónap bejegyzései (dátum, kezdés, időtartam, tizedes óra,
-  megjegyzés), napi összesítők és a havi összeg.
-- **CSV importálása:** a korábban exportált fájlt visszatölti (például új gépen vagy telefoncsere után).
+  megjegyzés), napi összesítők és a havi összeg, valamint a hónapban elvégzett és az összes nyitott teendő.
+- **CSV importálása:** a korábban exportált fájlt visszatölti (például új gépen vagy telefoncsere után), a
+  teendőket is.
   Összefésül: amit az app már tartalmaz (azonos kezdés percre, időtartam és megjegyzés), azt kihagyja, így
   többször is importálhatsz duplikátumok nélkül. A kezdés másodperce az exportban nincs benne, az időtartam
   viszont másodpercre pontos.
@@ -65,6 +67,22 @@ szünetel, hogy ne mérjen olyan időt, amikor nem futott a program. Összeomlá
 mentett pillanatig.
 
 <p align="center"><img src="docs/images/windows-munkaido.png" alt="Munkaidő ablak"></p>
+
+### Napi teendők
+
+Egyszerű teendő-lista a napra.
+
+- **Hozzáadás:** írd be a teendőt, majd `Enter` vagy a `Hozzáadás` gomb.
+- **Kipipálás:** kattints a pipa oszlopra (vagy `Kész / visszanyitás`). A kész teendő áthúzottan, a lista alján
+  marad, és újra megnyitható.
+- **Másnapra átmegy:** a nem kész teendők minden nap megmaradnak. A kész teendő azon a napon számít
+  elvégzettnek, amikor kipipáltad.
+- **Szerkesztés** (dupla kattintás), **átrendezés** (`▲ Feljebb`, `▼ Lejjebb`) és **törlés**.
+- A **Munkaidő** ablak napi összesítője felsorolja az adott napon elvégzett teendőket is.
+
+A teendők a `%APPDATA%\Szemkimelo\tasks.json` fájlban vannak.
+
+<p align="center"><img src="docs/images/windows-teendok.png" alt="Teendők ablak"></p>
 
 ### Képek
 
@@ -135,6 +153,7 @@ Natív Kotlin + Jetpack Compose app, ugyanazokkal az alapfunkciókkal. Részlete
 <td align="center"><b>Szünet</b><br><img src="docs/images/android-szunet.png" width="230" alt="Szünet-képernyő"></td>
 <td align="center"><b>Zárolt képernyőn</b><br><img src="docs/images/android-zarolt.png" width="230" alt="Szünet zárolt képernyőn"></td>
 <td align="center"><b>Munkaidő</b><br><img src="docs/images/android-munkaido.png" width="230" alt="Munkaidő stopper"></td>
+<td align="center"><b>Teendők</b><br><img src="docs/images/android-teendok.png" width="230" alt="Napi teendők"></td>
 </tr>
 </table>
 
@@ -144,11 +163,14 @@ Natív Kotlin + Jetpack Compose app, ugyanazokkal az alapfunkciókkal. Részlete
   A mérés akkor is fut, ha az app a háttérben van vagy a rendszer leállította. A hónap **CSV-ben
   exportálható** és megosztható (Drive, e-mail stb.), az exportált fájl pedig **visszaimportálható**
   (telefoncsere után is megvan az adat).
+- **Napi teendők** a `✅ Teendők` fülön: hozzáadás, kipipálás, szerkesztés, átrendezés, törlés. A nem kész
+  teendők másnapra is megmaradnak, a kész teendők a `Munkaidő` fül napi összesítőjében látszanak, és
+  bekerülnek a CSV exportba is.
 - Újraindítás után az emlékeztetők maguktól folytatódnak.
 
 ### Telepítés
 
-1. Töltsd le az APK-t a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.1.0) oldalról. Ha az 1.0.1-es vagy régebbi
+1. Töltsd le az APK-t a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.2.0) oldalról. Ha az 1.0.1-es vagy régebbi
    verzió van fent, előbb töröld le (a v1.0.2-től az APK saját, állandó kulccsal van aláírva, ezért ez egyszer
    szükséges; a későbbi frissítések már a telepített fölé kerülnek).
 2. Nyisd meg, és engedélyezd az ismeretlen forrásból való telepítést.
@@ -222,6 +244,8 @@ Helyi buildhez az `android/keystore.properties` fájl kell (`storeFile`, `storeP
 szemkimelo.py      A Windowsos app (Python + tkinter)
 worklog.py         A munkaidő stopper logikája (Windows)
 worklog_ui.py      A munkaidő ablak (Windows)
+tasks.py           A napi teendők logikája (Windows)
+tasks_ui.py        A teendők ablaka (Windows)
 tests/             Egységtesztek (python -m unittest discover -s tests)
 requirements.txt   Windowsos függőségek
 android/           Az Androidos app (Kotlin + Compose)

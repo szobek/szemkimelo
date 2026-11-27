@@ -20,6 +20,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -89,25 +90,31 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Két fül: a 20-20-20 emlékeztető és a munkaidő-stopper. */
+/** Három fül: a 20-20-20 emlékeztető, a munkaidő-stopper és a napi teendők. */
 @Composable
 private fun AppRoot() {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            listOf("👀 Szemkímélő", "⏱ Munkaidő").forEachIndexed { index, label ->
+            val pad = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+            listOf("👀 Szemkímélő", "⏱ Munkaidő", "✅ Teendők").forEachIndexed { index, label ->
+                val text: @Composable () -> Unit = { Text(label, maxLines = 1, fontSize = 13.sp) }
                 if (tab == index) {
-                    Button(onClick = { tab = index }, modifier = Modifier.weight(1f)) { Text(label) }
+                    Button(onClick = { tab = index }, modifier = Modifier.weight(1f), contentPadding = pad) { text() }
                 } else {
-                    OutlinedButton(onClick = { tab = index }, modifier = Modifier.weight(1f)) { Text(label) }
+                    OutlinedButton(onClick = { tab = index }, modifier = Modifier.weight(1f), contentPadding = pad) { text() }
                 }
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (tab == 0) MainScreen() else WorkLogScreen()
+            when (tab) {
+                0 -> MainScreen()
+                1 -> WorkLogScreen()
+                else -> TasksScreen()
+            }
         }
     }
 }

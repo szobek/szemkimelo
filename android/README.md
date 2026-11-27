@@ -44,11 +44,18 @@ vízivás-emlékeztetővel. Natív Kotlin + Jetpack Compose app.
     nélkül. Új telefonon így állíthatod vissza a régi adatokat.
   - A mérés időbélyegekre épül, ezért akkor is helyes marad, ha az app a háttérben van vagy a rendszer
     leállította. Az adatok az app belső tárolójában vannak (`worklog.json`), nem hagyják el a telefont.
+- **Napi teendők** (`✅ Teendők` fül): egyszerű lista a napra.
+  - Hozzáadás (`Enter` vagy `Hozzáadás`), kipipálás a jelölőnégyzettel, szerkesztés, `▲` / `▼` átrendezés,
+    törlés. A kész teendő áthúzva a lista alján marad, és újra megnyitható.
+  - A nem kész teendők minden nap megmaradnak (másnapra "átmennek"). A kész teendő azon a napon számít
+    elvégzettnek, amikor kipipáltad, és a `Munkaidő` fül napi összesítőjében is megjelenik.
+  - A teendők (a hónapban elvégzettek és az összes nyitott) a CSV exportba is bekerülnek, és az importtal
+    vissza is jönnek. Az adatok a `tasks.json` fájlban vannak az app belső tárolójában.
 - Nincs internet-hozzáférés, nincs adatgyűjtés.
 
 ## Telepítés (APK)
 
-1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.1.0)
+1. Töltsd le az `.apk` fájlt a [Releases](https://github.com/szobek/szemkimelo/releases/tag/android-v1.2.0)
    oldalról. Ha az 1.0.1-es vagy régebbi verzió van fent, előbb töröld le (a v1.0.2-től az APK saját,
    állandó kulccsal van aláírva, ezért ez egyszer szükséges; a későbbi frissítések már a telepített fölé kerülnek).
 2. Nyisd meg a telefonon, és engedélyezd az ismeretlen forrásból való telepítést.
@@ -140,6 +147,8 @@ A `local.properties` fájlban kell megadni az SDK helyét (`sdk.dir=...`); ez ni
 | `MainActivity.kt` | a Compose felület: fülek, állapot, beállítások, engedélykezelés |
 | `WorkLog.kt` | a munkaidő stopper logikája és tárolása |
 | `WorkLogScreen.kt` | a `Munkaidő` fül felülete |
+| `Tasks.kt` | a napi teendők logikája és tárolása |
+| `TasksScreen.kt` | a `Teendők` fül felülete |
 | `ReminderService.kt` | előtér-szolgáltatás: a szünet, az ivás és az ebéd eseményei |
 | `Scheduler.kt` | az ébresztők beállítása és törlése |
 | `Notifications.kt` | értesítési csatornák és értesítések |

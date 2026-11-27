@@ -21,6 +21,8 @@ from PIL import Image, ImageDraw
 
 from worklog import WorkLog
 from worklog_ui import WorkLogWindow
+from tasks import TaskList
+from tasks_ui import TasksWindow
 
 try:
     import winreg
@@ -33,6 +35,7 @@ RUN_VALUE = "Szemkimelo"
 CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Szemkimelo")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
 WORKLOG_PATH = os.path.join(CONFIG_DIR, "worklog.json")
+TASKS_PATH = os.path.join(CONFIG_DIR, "tasks.json")
 
 DEFAULTS = {
     "work_minutes": 20,
@@ -200,6 +203,8 @@ class App:
         self.settings_win: tk.Toplevel | None = None
         self.worklog = WorkLog(WORKLOG_PATH)
         self.worklog_win: WorkLogWindow | None = None
+        self.tasks = TaskList(TASKS_PATH)
+        self.tasks_win: TasksWindow | None = None
 
         self.icon = pystray.Icon(
             "szemkimelo", make_icon(), APP_NAME, menu=self.build_menu()
@@ -270,6 +275,7 @@ class App:
         row3 = tk.Frame(win, bg=BG)
         row3.pack(pady=4)
         self.worklog_btn = btn("⏱ Munkaidő", lambda: self.events.put("worklog"), row3)
+        self.tasks_btn = btn("✅ Teendők", lambda: self.events.put("tasks"), row3)
 
         tk.Label(win, text="Bezárás (X) = a tálcán fut tovább.", font=("Segoe UI", 9),
                  bg=BG, fg=MUTED).pack(pady=(10, 0))
@@ -328,6 +334,7 @@ class App:
             pystray.MenuItem("Időzítő újraindítása", lambda: self.events.put("reset")),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Munkaidő…", lambda: self.events.put("worklog")),
+            pystray.MenuItem("Teendők…", lambda: self.events.put("tasks")),
             pystray.MenuItem("Beállítások…", lambda: self.events.put("settings")),
             pystray.MenuItem("Kilépés", lambda: self.events.put("quit")),
         )
@@ -370,6 +377,8 @@ class App:
         self.worklog.beat()
         if self.worklog_win is not None:
             self.worklog_win.update()
+        if self.tasks_win is not None:
+            self.tasks_win.update()
         self.root.after(80 if self.state == "break" else 250, self.tick)
 
     def check_reminders(self, now: float) -> None:
@@ -483,6 +492,8 @@ class App:
             self.open_settings()
         elif event == "worklog":
             self.open_worklog()
+        elif event == "tasks":
+            self.open_tasks()
         elif event == "quit":
             self.quit()
 
@@ -687,11 +698,23 @@ class App:
             self.worklog_win.show()
             return
         colors = {"bg": BG, "fg": FG, "accent": ACCENT, "muted": MUTED}
-        self.worklog_win = WorkLogWindow(self.root, self.worklog, colors, self._worklog_closed)
+        self.worklog_win = WorkLogWindow(self.root, self.worklog, colors, self._worklog_closed, self.tasks)
         self.worklog_win.show()
 
     def _worklog_closed(self) -> None:
         self.worklog_win = None
+
+    # ---- teendők
+    def open_tasks(self) -> None:
+        if self.tasks_win is not None:
+            self.tasks_win.show()
+            return
+        colors = {"bg": BG, "fg": FG, "accent": ACCENT, "muted": MUTED}
+        self.tasks_win = TasksWindow(self.root, self.tasks, colors, self._tasks_closed)
+        self.tasks_win.show()
+
+    def _tasks_closed(self) -> None:
+        self.tasks_win = None
 
     def quit(self) -> None:
         self.worklog.pause()  # kilépéskor a futó mérés szünetel (a következő indításkor folytatható)

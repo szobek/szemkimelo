@@ -13,6 +13,7 @@ import os
 import tempfile
 import time
 from datetime import date, datetime
+from typing import NamedTuple
 
 HEARTBEAT_SECS = 30  # ennyi időnként mentjük a futó mérés "életjelét" (összeomlás/áramszünet ellen)
 
@@ -31,6 +32,13 @@ def fmt_dur(seconds: float) -> str:
     if m:
         return f"{m} p"
     return f"{s} mp"
+
+
+class ImportResult(NamedTuple):
+    added: int          # új munkaidő-bejegyzés
+    skipped: int        # már megvolt (kihagyva)
+    bad: int            # hibás sor
+    tasks_added: int = 0  # új teendő
 
 
 def csv_hours(seconds: int) -> str:
@@ -201,8 +209,11 @@ class WorkLog:
                        if (d := self._day_of(e)).year == year and d.month == month),
                       key=lambda e: e["start"])
 
-    def month_csv(self, year: int, month: int) -> str:
-        """A hónap bejegyzései és napi összesítői CSV-ben (pontosvesszős, magyar Excelhez)."""
+    def month_csv(self, year: int, month: int, tasks=None) -> str:
+        """A hónap bejegyzései és napi összesítői CSV-ben (pontosvesszős, magyar Excelhez).
+
+        Ha `tasks` (TaskList) is megvan, a hónapban elvégzett és az összes nyitott teendő is bekerül.
+        """
         out = io.StringIO()
         w = csv.writer(out, delimiter=";", lineterminator="\r\n")
         entries = self.month_entries(year, month)
@@ -221,13 +232,23 @@ class WorkLog:
             w.writerow([d.strftime("%Y.%m.%d."), "", fmt_hms(days[d]), csv_hours(days[d])])
         total = sum(days.values())
         w.writerow([f"Összesen ({year}.{month:02d}.)", "", fmt_hms(total), csv_hours(total)])
+        if tasks is not None:
+            for title, items in (("Elvégzett teendők", tasks.done_in_month(year, month)),
+                                 ("Nyitott teendők", tasks.open_tasks())):
+                w.writerow([])
+                w.writerow([title])
+                w.writerow(["Dátum", "Idő", "Teendő"])  # elvégzés, nyitottnál létrehozás ideje
+                for t in items:
+                    dt = datetime.fromtimestamp(t["done_at"] if title.startswith("Elvégzett") else t["created"])
+                    w.writerow([dt.strftime("%Y.%m.%d."), dt.strftime("%H:%M"), csv_safe(t["text"])])
         return out.getvalue()
 
-    def import_csv_text(self, text: str) -> tuple[int, int, int]:
+    def import_csv_text(self, text: str, tasks=None) -> ImportResult:
         """Exportált CSV visszaolvasása. Összefésül: ami már megvan, azt kihagyja.
 
-        Visszatér: (új, már megvolt, hibás sor). Ha a szöveg nem munkaidő-export, ValueError.
-        A bejegyzés azonosítása: kezdés (percre), időtartam, megjegyzés.
+        A bejegyzés azonosítása: kezdés (percre), időtartam, megjegyzés. Ha `tasks` (TaskList) meg van
+        adva, az "Elvégzett teendők" és "Nyitott teendők" szakaszt is visszatölti.
+        Ha a szöveg nem munkaidő-export, ValueError.
         """
         rows = list(csv.reader(io.StringIO(text.lstrip("\ufeff")), delimiter=";"))
         if not rows or [c.strip() for c in rows[0][:3]] != ["Dátum", "Kezdés", "Időtartam"]:
@@ -238,9 +259,43 @@ class WorkLog:
 
         known = {key(e["start"], int(e["seconds"]), e.get("note", "")) for e in self.entries}
         added = skipped = bad = 0
+        tasks_added = 0
+        section = "entries"
+        header_next = False
         for row in rows[1:]:
             if not any(c.strip() for c in row):
-                break  # a bejegyzések táblázata itt véget ér (utána a napi összesítő jön)
+                section = None  # üres sor: új szakasz (vagy a vége) következik
+                continue
+            title = row[0].strip() if len([c for c in row if c.strip()]) == 1 else ""
+            if title in ("Napi összesítő", "Elvégzett teendők", "Nyitott teendők"):
+                section = {"Napi összesítő": "daily", "Elvégzett teendők": "done",
+                           "Nyitott teendők": "open"}[title]
+                header_next = section != "daily"
+                continue
+            if section in ("done", "open"):
+                if header_next:
+                    header_next = False
+                    continue
+                if tasks is None:
+                    continue
+                try:
+                    day = datetime.strptime(row[0].strip(), "%Y.%m.%d.")
+                    hh, mm = row[1].strip().split(":")
+                    when = day.replace(hour=int(hh), minute=int(mm)).timestamp()
+                    ttext = row[2].strip()
+                except (ValueError, IndexError):
+                    bad += 1
+                    continue
+                if ttext[:1] == "'" and ttext[1:2] in ("=", "+", "-", "@"):
+                    ttext = ttext[1:]
+                if not ttext:
+                    bad += 1
+                    continue
+                if tasks.add_imported(ttext, when, when if section == "done" else None):
+                    tasks_added += 1
+                continue
+            if section != "entries":
+                continue
             try:
                 day = datetime.strptime(row[0].strip(), "%Y.%m.%d.")
                 hh, mm = row[1].strip().split(":")
@@ -266,15 +321,15 @@ class WorkLog:
             added += 1
         if added:
             self._changed()
-        return added, skipped, bad
+        return ImportResult(added, skipped, bad, tasks_added)
 
-    def import_csv(self, path: str) -> tuple[int, int, int]:
+    def import_csv(self, path: str, tasks=None) -> ImportResult:
         if os.path.getsize(path) > 5_000_000:
             raise ValueError("A fájl túl nagy ahhoz, hogy munkaidő-export legyen.")
         with open(path, encoding="utf-8-sig", newline="") as f:
-            return self.import_csv_text(f.read())
+            return self.import_csv_text(f.read(), tasks)
 
-    def export_month(self, year: int, month: int, path: str) -> None:
+    def export_month(self, year: int, month: int, path: str, tasks=None) -> None:
         """Fájlba írja a hónapot UTF-8 BOM-mal, hogy az Excel helyesen mutassa az ékezeteket."""
         with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            f.write(self.month_csv(year, month))
+            f.write(self.month_csv(year, month, tasks))
